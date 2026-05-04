@@ -110,7 +110,7 @@ export default function FarmerOrder() {
   // ── Confirmation ─────────────────────────────────────────────────────────
   if (step === 'confirmation') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen page-shell">
         <Navbar />
         <div className="max-w-lg mx-auto px-6 py-20 text-center">
           <div className="bg-white rounded-2xl shadow p-10">
@@ -146,7 +146,7 @@ export default function FarmerOrder() {
 
   // ── Main Order Page ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen page-shell">
       <Navbar />
       <div className="max-w-5xl mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Place Order</h1>

@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth.routes');
 const customerRoutes = require('./routes/customer.routes');
 const farmerRoutes = require('./routes/farmer.routes');
 const employeeRoutes = require('./routes/employee.routes');
+const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/farmer', farmerRoutes);
 app.use('/api/employee', employeeRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/', (req, res) => {

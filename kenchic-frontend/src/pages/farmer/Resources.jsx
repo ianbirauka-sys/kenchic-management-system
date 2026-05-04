@@ -42,7 +42,7 @@ export default function Resources() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen page-shell">
       {/* Navbar */}
       <nav className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/farmer/chicks')}>

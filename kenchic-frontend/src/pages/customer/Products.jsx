@@ -2,24 +2,25 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts } from '../../api/customer.api';
 import { useAuth } from '../../context/AuthContext';
+import PageWrapper from '../../components/PageWrapper';
+
+const CATEGORY_EMOJI = { chicks: '🐣', poultry: '🍗', feed: '🌾', equipment: '🔧' };
 
 export default function Products() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('cart');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('cart') || '[]'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
   const [added, setAdded] = useState(null);
 
   useEffect(() => {
     getProducts()
       .then(res => setProducts(res.data.data))
-      .catch(() => setError('Failed to load products. Please try again.'))
+      .catch(() => setError('Failed to load products.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -37,131 +38,179 @@ export default function Products() {
   };
 
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-
+  const categories = ['all', ...new Set(products.map(p => p.category))];
   const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
+    (filter === 'all' || p.category === filter) &&
+    (p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🐔</span>
-          <span className="font-bold text-green-700 text-lg">Kenchic</span>
+    <PageWrapper cartCount={cartCount}>
+      {/* Hero banner */}
+      <div style={styles.hero}>
+        <div>
+          <p style={styles.heroEyebrow}>Fresh & quality assured</p>
+          <h1 style={styles.heroTitle}>
+            Welcome, <span style={{ color: '#fef9c3' }}>{user?.name?.split(' ')[0]}</span> 👋
+          </h1>
+          <p style={styles.heroSub}>Browse our full range of fresh Kenchic products</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/customer/orders')}
-            className="text-sm text-gray-600 hover:text-green-700"
-          >
-            My Orders
-          </button>
-          <button
-            onClick={() => navigate('/customer/cart')}
-            className="relative bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
-          >
-            🛒 Cart
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { logout(); navigate('/login'); }}
-            className="text-sm text-gray-500 hover:text-red-600"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+        <span style={{ fontSize: '80px', opacity: 0.9 }}>🐔</span>
+      </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Welcome back, {user?.name} 👋</h1>
-          <p className="text-gray-500 mt-1">Browse our fresh products below</p>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
+      {/* Search + filters */}
+      <div style={styles.filterRow}>
+        <div style={styles.searchWrap}>
+          <span>🔍</span>
           <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full max-w-md border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            type="text" placeholder="Search products..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            style={styles.searchInput}
           />
         </div>
+        <div style={styles.tabs}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setFilter(cat)}
+              style={{ ...styles.tab, ...(filter === cat ? styles.tabActive : {}) }}>
+              {cat === 'all' ? '✨ All' : `${CATEGORY_EMOJI[cat] || '📦'} ${cat}`}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* States */}
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
-          </div>
-        )}
+      {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
+      {error && <div style={styles.errorBox}>{error}</div>}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* Products grid */}
-        {!loading && !error && (
-          <>
-            {filtered.length === 0 ? (
-              <p className="text-gray-500 text-center py-20">No products found for "{search}"</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filtered.map(product => (
-                  <div key={product.id} className="bg-white rounded-xl shadow-sm border hover:shadow-md transition-shadow flex flex-col">
-                    {/* Image placeholder */}
-                    <div className="bg-green-50 rounded-t-xl h-40 flex items-center justify-center text-5xl">
-                      {product.category === 'chicks' ? '🐣' : product.category === 'feed' ? '🌾' : '🍗'}
-                    </div>
-
-                    <div className="p-4 flex flex-col flex-1">
-                      <span className="text-xs font-medium text-green-600 uppercase tracking-wide">
-                        {product.category}
-                      </span>
-                      <h3 className="font-semibold text-gray-800 mt-1">{product.name}</h3>
-                      <p className="text-gray-500 text-sm mt-1 flex-1 line-clamp-2">
-                        {product.description || 'No description available'}
-                      </p>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <span className="text-green-700 font-bold text-lg">
-                          KSh {Number(product.price).toLocaleString()}
-                        </span>
-                        <span className={`text-xs px-2 py-1 rounded-full ${product.stock_quantity > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                          {product.stock_quantity > 0 ? `${product.stock_quantity} in stock` : 'Out of stock'}
-                        </span>
-                      </div>
-
+      {!loading && !error && (
+        <>
+          <p style={styles.count}>{filtered.length} product{filtered.length !== 1 ? 's' : ''}</p>
+          {filtered.length === 0 ? (
+            <div style={styles.empty}>
+              <p style={{ fontSize: '48px' }}>🔍</p>
+              <p style={{ color: '#a8a29e', marginTop: '12px' }}>No products found</p>
+            </div>
+          ) : (
+            <div style={styles.grid}>
+              {filtered.map(p => (
+                <div key={p.id} style={styles.card}>
+                  <div style={styles.cardImg}>
+                    <span style={{ fontSize: '52px' }}>{CATEGORY_EMOJI[p.category] || '📦'}</span>
+                    <span style={{
+                      ...styles.badge,
+                      background: p.stock_quantity > 0 ? '#dcfce7' : '#fee2e2',
+                      color: p.stock_quantity > 0 ? '#16a34a' : '#dc2626',
+                    }}>
+                      {p.stock_quantity > 0 ? 'In stock' : 'Out of stock'}
+                    </span>
+                  </div>
+                  <div style={styles.cardBody}>
+                    <span style={styles.catLabel}>{p.category}</span>
+                    <h3 style={styles.cardName}>{p.name}</h3>
+                    <p style={styles.cardDesc}>{p.description || 'Premium quality Kenchic product.'}</p>
+                    <div style={styles.cardFooter}>
+                      <span style={styles.price}>KSh {Number(p.price).toLocaleString()}</span>
                       <button
-                        onClick={() => addToCart(product)}
-                        disabled={product.stock_quantity === 0}
-                        className={`mt-3 w-full py-2 rounded-lg text-sm font-medium transition-colors ${
-                          added === product.id
-                            ? 'bg-green-100 text-green-700'
-                            : product.stock_quantity === 0
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-green-600 text-white hover:bg-green-700'
-                        }`}
+                        onClick={() => addToCart(p)}
+                        disabled={p.stock_quantity === 0}
+                        style={{
+                          ...styles.addBtn,
+                          ...(added === p.id ? { background: '#16a34a' } : {}),
+                          ...(p.stock_quantity === 0 ? styles.addBtnDisabled : {}),
+                        }}
                       >
-                        {added === product.id ? '✓ Added!' : 'Add to cart'}
+                        {added === p.id ? '✓ Added' : '+ Add'}
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {cartCount > 0 && (
+        <div style={styles.floatingCart} onClick={() => navigate('/customer/cart')}>
+          <span>🛒</span>
+          <span>{cartCount} item{cartCount > 1 ? 's' : ''} in cart</span>
+          <span>→</span>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        input:focus { outline: none; }
+      `}</style>
+    </PageWrapper>
   );
 }
+
+const styles = {
+hero: {
+  background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
+  borderRadius: '20px', padding: '40px 48px', marginBottom: '28px',
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
+  heroEyebrow: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' },
+  heroTitle: { fontFamily: "'Playfair Display', serif", fontSize: '34px', fontWeight: 700, color: '#fff', marginBottom: '8px' },
+  heroSub: { fontSize: '15px', color: 'rgba(255,255,255,0.85)' },
+  filterRow: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' },
+  searchWrap: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    background: '#fff', border: '1.5px solid #e7e5e4',
+    borderRadius: '12px', padding: '0 16px', flex: 1, minWidth: '200px',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+  },
+  searchInput: { border: 'none', background: 'transparent', padding: '12px 0', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', width: '100%' },
+  tabs: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+  tab: {
+    padding: '8px 16px', borderRadius: '100px',
+    border: '1.5px solid #e7e5e4', background: '#fff',
+    fontSize: '13px', fontWeight: 500, color: '#78716c',
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", textTransform: 'capitalize',
+  },
+  tabActive: { background: '#fff7ed', borderColor: '#d97706', color: '#d97706', fontWeight: 600 },
+  count: { fontSize: '13px', color: '#a8a29e', marginBottom: '16px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' },
+card: {
+  background: '#fff', borderRadius: '16px',
+  border: '1px solid #e8ddd4', overflow: 'hidden',
+  boxShadow: '0 4px 12px rgba(180,80,0,0.1)',
+  },
+cardImg: {
+  background: 'linear-gradient(135deg, #fde8c8, #fdba74)',
+  height: '140px', display: 'flex', alignItems: 'center',
+  justifyContent: 'center', position: 'relative',
+},
+  badge: {
+    position: 'absolute', top: '12px', right: '12px',
+    fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '100px',
+  },
+  cardBody: { padding: '16px' },
+  catLabel: { fontSize: '11px', fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  cardName: { fontSize: '16px', fontWeight: 600, color: '#1c0a00', margin: '4px 0 6px', fontFamily: "'DM Sans', sans-serif" },
+  cardDesc: { fontSize: '13px', color: '#6b5c52', lineHeight: 1.5, marginBottom: '16px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
+  cardFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  price: { fontSize: '18px', fontWeight: 700, color: '#7c2d12', fontFamily: "'DM Sans', sans-serif" },
+  addBtn: {
+    background: 'linear-gradient(135deg, #d97706, #ea580c)',
+    color: '#fff', border: 'none', borderRadius: '8px',
+    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+    boxShadow: '0 2px 8px rgba(217,119,6,0.3)', transition: 'all 0.2s',
+  },
+  addBtnDisabled: { background: '#e7e5e4', color: '#a8a29e', cursor: 'not-allowed', boxShadow: 'none' },
+  center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
+  spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px' },
+  empty: { textAlign: 'center', padding: '80px 0' },
+  floatingCart: {
+    position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)',
+    background: 'linear-gradient(135deg, #d97706, #ea580c)',
+    color: '#fff', borderRadius: '100px', padding: '14px 28px',
+    display: 'flex', alignItems: 'center', gap: '10px',
+    fontSize: '14px', fontWeight: 600,
+    boxShadow: '0 8px 32px rgba(217,119,6,0.45)',
+    cursor: 'pointer', zIndex: 50, fontFamily: "'DM Sans', sans-serif",
+  },
+};
