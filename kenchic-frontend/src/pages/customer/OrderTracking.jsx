@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyOrders } from '../../api/customer.api';
-import { useAuth } from '../../context/AuthContext';
+import PageWrapper from '../../components/PageWrapper';
 
 const STATUS_STEPS = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
-
 const STATUS_INFO = {
-  pending:    { label: 'Pending',    color: 'bg-yellow-100 text-yellow-700', icon: '🕐' },
-  confirmed:  { label: 'Confirmed',  color: 'bg-blue-100 text-blue-700',     icon: '✅' },
-  processing: { label: 'Processing', color: 'bg-purple-100 text-purple-700', icon: '⚙️' },
-  shipped:    { label: 'Shipped',    color: 'bg-orange-100 text-orange-700', icon: '🚚' },
-  delivered:  { label: 'Delivered',  color: 'bg-green-100 text-green-700',   icon: '🎉' },
-  cancelled:  { label: 'Cancelled',  color: 'bg-red-100 text-red-700',       icon: '❌' },
+  pending:    { label: 'Pending',    color: '#92400e', bg: '#fff7ed', icon: '🕐' },
+  confirmed:  { label: 'Confirmed',  color: '#1d4ed8', bg: '#eff6ff', icon: '✅' },
+  processing: { label: 'Processing', color: '#6d28d9', bg: '#f5f3ff', icon: '⚙️' },
+  shipped:    { label: 'Shipped',    color: '#c2410c', bg: '#fff7ed', icon: '🚚' },
+  delivered:  { label: 'Delivered',  color: '#15803d', bg: '#f0fdf4', icon: '🎉' },
+  cancelled:  { label: 'Cancelled',  color: '#dc2626', bg: '#fff5f5', icon: '❌' },
 };
 
 export default function OrderTracking() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,168 +23,164 @@ export default function OrderTracking() {
   useEffect(() => {
     getMyOrders()
       .then(res => setOrders(res.data.data))
-      .catch(() => setError('Failed to load orders. Please try again.'))
+      .catch(() => setError('Failed to load orders.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const toggleExpand = (id) => setExpanded(prev => prev === id ? null : id);
-
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('en-KE', {
-      day: 'numeric', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
+  const formatDate = (d) => new Date(d).toLocaleDateString('en-KE', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
 
   return (
-    <div className="min-h-screen page-shell">
-      {/* Navbar */}
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/customer/products')}>
-          <span className="text-2xl">🐔</span>
-          <span className="font-bold text-green-700 text-lg">Kenchic</span>
+    <PageWrapper>
+      {/* Header */}
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>My Orders</h1>
+          <p style={styles.sub}>Track and manage your Kenchic orders</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/customer/products')} className="text-sm text-gray-600 hover:text-green-700">
-            Products
-          </button>
-          <button onClick={() => navigate('/customer/cart')} className="text-sm text-gray-600 hover:text-green-700">
-            🛒 Cart
-          </button>
-          <button onClick={() => { logout(); navigate('/login'); }} className="text-sm text-gray-500 hover:text-red-600">
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">My Orders</h1>
-        <p className="text-gray-500 mb-6">Track the status of your orders below</p>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3">
-            {error}
-          </div>
-        )}
-
-        {/* Empty */}
-        {!loading && !error && orders.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm border p-16 text-center">
-            <div className="text-5xl mb-4">📦</div>
-            <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
-            <button
-              onClick={() => navigate('/customer/products')}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700"
-            >
-              Start Shopping
-            </button>
-          </div>
-        )}
-
-        {/* Orders list */}
-        {!loading && !error && orders.length > 0 && (
-          <div className="space-y-4">
-            {orders.map(order => {
-              const status = STATUS_INFO[order.status] || STATUS_INFO.pending;
-              const stepIndex = STATUS_STEPS.indexOf(order.status);
-              const isCancelled = order.status === 'cancelled';
-              const isExpanded = expanded === order.id;
-
-              return (
-                <div key={order.id} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                  {/* Order header */}
-                  <div
-                    className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => toggleExpand(order.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-800">Order #{order.id}</p>
-                        <p className="text-sm text-gray-500 mt-0.5">{formatDate(order.created_at)}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs font-medium px-3 py-1 rounded-full ${status.color}`}>
-                          {status.icon} {status.label}
-                        </span>
-                        <span className="text-green-700 font-bold">
-                          KSh {Number(order.total_amount).toLocaleString()}
-                        </span>
-                        <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-                    </div>
-
-                    {/* Progress bar */}
-                    {!isCancelled && (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between mb-1">
-                          {STATUS_STEPS.map((s, i) => (
-                            <div key={s} className="flex flex-col items-center flex-1">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
-                                ${i <= stepIndex ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
-                              </div>
-                              {i < STATUS_STEPS.length - 1 && (
-                                <div className={`h-0.5 w-full mt-2.5 absolute`} />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="relative flex items-center mt-1">
-                          <div className="absolute w-full h-1 bg-gray-200 rounded-full" />
-                          <div
-                            className="absolute h-1 bg-green-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(stepIndex / (STATUS_STEPS.length - 1)) * 100}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between mt-2">
-                          {STATUS_STEPS.map((s, i) => (
-                            <span key={s} className={`text-xs capitalize ${i <= stepIndex ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className="border-t px-5 py-4 bg-gray-50">
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                        <div>
-                          <p className="text-gray-500">Order type</p>
-                          <p className="font-medium text-gray-800 capitalize">{order.order_type}</p>
-                        </div>
-                        {order.delivery_address && (
-                          <div>
-                            <p className="text-gray-500">Delivery address</p>
-                            <p className="font-medium text-gray-800">{order.delivery_address}</p>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 italic">
-                        {isCancelled
-                          ? 'This order was cancelled.'
-                          : order.status === 'delivered'
-                          ? 'Your order has been delivered. Enjoy!'
-                          : 'Your order is being processed. We will update you as it progresses.'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <button onClick={() => navigate('/customer/products')} style={styles.shopBtn}>
+          + Shop More
+        </button>
       </div>
-    </div>
+
+      {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
+      {error && <div style={styles.errorBox}>{error}</div>}
+
+      {!loading && !error && orders.length === 0 && (
+        <div style={styles.emptyState}>
+          <p style={{ fontSize: '56px' }}>📦</p>
+          <p style={{ fontSize: '18px', fontWeight: 600, color: '#44403c', marginTop: '16px' }}>No orders yet</p>
+          <p style={{ fontSize: '14px', color: '#a8a29e', margin: '8px 0 24px' }}>Your order history will appear here</p>
+          <button onClick={() => navigate('/customer/products')} style={styles.primaryBtn}>Start Shopping</button>
+        </div>
+      )}
+
+      {!loading && !error && orders.length > 0 && (
+        <div style={styles.ordersList}>
+          {orders.map(order => {
+            const status = STATUS_INFO[order.status] || STATUS_INFO.pending;
+            const stepIndex = STATUS_STEPS.indexOf(order.status);
+            const isCancelled = order.status === 'cancelled';
+            const isExpanded = expanded === order.id;
+
+            return (
+              <div key={order.id} style={styles.orderCard}>
+                {/* Order header */}
+                <div style={styles.orderHeader} onClick={() => setExpanded(isExpanded ? null : order.id)}>
+                  <div style={styles.orderLeft}>
+                    <div style={{ ...styles.statusIcon, background: status.bg, color: status.color }}>
+                      {status.icon}
+                    </div>
+                    <div>
+                      <p style={styles.orderId}>Order #{order.id}</p>
+                      <p style={styles.orderDate}>{formatDate(order.created_at)}</p>
+                    </div>
+                  </div>
+                  <div style={styles.orderRight}>
+                    <span style={{ ...styles.statusBadge, color: status.color, background: status.bg }}>
+                      {status.label}
+                    </span>
+                    <span style={styles.orderTotal}>KSh {Number(order.total_amount).toLocaleString()}</span>
+                    <span style={{ color: '#a8a29e', fontSize: '13px' }}>{isExpanded ? '▲' : '▼'}</span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {!isCancelled && (
+                  <div style={styles.progressWrap}>
+                    <div style={styles.progressTrack}>
+                      <div style={{ ...styles.progressFill, width: `${(stepIndex / (STATUS_STEPS.length - 1)) * 100}%` }} />
+                    </div>
+                    <div style={styles.stepsRow}>
+                      {STATUS_STEPS.map((s, i) => (
+                        <div key={s} style={styles.stepItem}>
+                          <div style={{
+                            ...styles.stepDot,
+                            background: i <= stepIndex ? '#d97706' : '#e7e5e4',
+                            color: i <= stepIndex ? '#fff' : '#a8a29e',
+                          }}>
+                            {i < stepIndex ? '✓' : ''}
+                          </div>
+                          <span style={{ ...styles.stepLabel, color: i <= stepIndex ? '#d97706' : '#a8a29e', fontWeight: i === stepIndex ? 600 : 400 }}>
+                            {s}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div style={styles.expandedBody}>
+                    <div style={styles.detailGrid}>
+                      <div style={styles.detailItem}>
+                        <p style={styles.detailLabel}>Order type</p>
+                        <p style={styles.detailValue}>{order.order_type}</p>
+                      </div>
+                      <div style={styles.detailItem}>
+                        <p style={styles.detailLabel}>Payment</p>
+                        <p style={{ ...styles.detailValue, color: order.payment_status === 'paid' ? '#15803d' : '#d97706', textTransform: 'capitalize' }}>
+                          {order.payment_status || 'unpaid'}
+                        </p>
+                      </div>
+                      {order.delivery_address && (
+                        <div style={{ ...styles.detailItem, gridColumn: '1 / -1' }}>
+                          <p style={styles.detailLabel}>Delivery address</p>
+                          <p style={styles.detailValue}>{order.delivery_address}</p>
+                        </div>
+                      )}
+                    </div>
+                    <p style={styles.statusNote}>
+                      {isCancelled ? 'This order was cancelled.' :
+                        order.status === 'delivered' ? '🎉 Your order has been delivered. Enjoy!' :
+                        '📦 Your order is being processed. We will keep you updated.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </PageWrapper>
   );
 }
+
+const styles = {
+  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' },
+  title: { fontFamily: "'Playfair Display', serif", fontSize: '28px', fontWeight: 700, color: '#1c0a00' },
+  sub: { fontSize: '14px', color: '#78716c', marginTop: '4px' },
+  shopBtn: { background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", boxShadow: '0 2px 10px rgba(217,119,6,0.3)' },
+  primaryBtn: { background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', border: 'none', borderRadius: '12px', padding: '14px 28px', fontSize: '15px', fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", boxShadow: '0 4px 16px rgba(217,119,6,0.35)' },
+  emptyState: { background: '#fff', borderRadius: '20px', border: '1px solid #ede8e0', padding: '80px 40px', textAlign: 'center', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px' },
+  center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
+  spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  ordersList: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  orderCard: { background: '#fff', borderRadius: '16px', border: '1px solid #ede8e0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  orderHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', cursor: 'pointer' },
+  orderLeft: { display: 'flex', alignItems: 'center', gap: '14px' },
+  statusIcon: { width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 },
+  orderId: { fontWeight: 600, color: '#1c0a00', fontSize: '15px' },
+  orderDate: { fontSize: '12px', color: '#a8a29e', marginTop: '2px' },
+  orderRight: { display: 'flex', alignItems: 'center', gap: '12px' },
+  statusBadge: { fontSize: '12px', fontWeight: 600, padding: '4px 12px', borderRadius: '100px' },
+  orderTotal: { fontWeight: 700, color: '#92400e', fontSize: '16px' },
+  progressWrap: { padding: '4px 24px 20px' },
+  progressTrack: { height: '4px', background: '#f5f0ea', borderRadius: '100px', margin: '0 0 12px', position: 'relative' },
+  progressFill: { height: '100%', background: 'linear-gradient(90deg, #d97706, #ea580c)', borderRadius: '100px', transition: 'width 0.5s ease' },
+  stepsRow: { display: 'flex', justifyContent: 'space-between' },
+  stepItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 },
+  stepDot: { width: '20px', height: '20px', borderRadius: '50%', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  stepLabel: { fontSize: '10px', textTransform: 'capitalize', textAlign: 'center' },
+  expandedBody: { padding: '0 24px 20px', borderTop: '1px solid #f5f0ea' },
+  detailGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '16px 0' },
+  detailItem: {},
+  detailLabel: { fontSize: '11px', color: '#a8a29e', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' },
+  detailValue: { fontSize: '14px', fontWeight: 500, color: '#1c0a00', textTransform: 'capitalize' },
+  statusNote: { fontSize: '13px', color: '#78716c', background: '#faf8f5', borderRadius: '10px', padding: '12px 16px' },
+};

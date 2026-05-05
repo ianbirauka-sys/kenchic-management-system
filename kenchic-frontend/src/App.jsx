@@ -27,11 +27,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 const RoleRedirect = () => {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/customer/products" replace />;
   if (user.role === 'customer') return <Navigate to="/customer/products" replace />;
   if (user.role === 'farmer') return <Navigate to="/farmer/chicks" replace />;
   if (user.role === 'employee') return <Navigate to="/employee/orders" replace />;
-  return <Navigate to="/login" replace />;
+  return <Navigate to="/customer/products" replace />;
 };
 
 function App() {
@@ -44,7 +44,7 @@ function App() {
           <Route path="/register" element={<Register />} />
 
           {/* Customer */}
-          <Route path="/customer/products" element={<ProtectedRoute allowedRoles={['customer']}><Products /></ProtectedRoute>} />
+          <Route path="/customer/products" element={<Products />} />
           <Route path="/customer/cart" element={<ProtectedRoute allowedRoles={['customer']}><Cart /></ProtectedRoute>} />
           <Route path="/customer/orders" element={<ProtectedRoute allowedRoles={['customer']}><OrderTracking /></ProtectedRoute>} />
 

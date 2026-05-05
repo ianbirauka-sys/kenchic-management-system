@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllOrders, updateOrderStatus } from '../../api/employee.api';
-import { useAuth } from '../../context/AuthContext';
+import PageWrapper from '../../components/PageWrapper';
 
 const STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-
 const STATUS_STYLES = {
-  pending:    'bg-yellow-100 text-yellow-700',
-  confirmed:  'bg-blue-100 text-blue-700',
-  processing: 'bg-purple-100 text-purple-700',
-  shipped:    'bg-orange-100 text-orange-700',
-  delivered:  'bg-green-100 text-green-700',
-  cancelled:  'bg-red-100 text-red-700',
+  pending:    { color: '#92400e', bg: '#fff7ed' },
+  confirmed:  { color: '#1d4ed8', bg: '#eff6ff' },
+  processing: { color: '#6d28d9', bg: '#f5f3ff' },
+  shipped:    { color: '#c2410c', bg: '#fff7ed' },
+  delivered:  { color: '#15803d', bg: '#f0fdf4' },
+  cancelled:  { color: '#dc2626', bg: '#fff5f5' },
 };
 
 export default function Orders() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,9 +23,7 @@ export default function Orders() {
   const [updating, setUpdating] = useState(null);
   const [expanded, setExpanded] = useState(null);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
   const fetchOrders = () => {
     setLoading(true);
@@ -42,182 +38,140 @@ export default function Orders() {
     try {
       await updateOrderStatus(orderId, newStatus);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-    } catch {
-      alert('Failed to update order status. Please try again.');
-    } finally {
-      setUpdating(null);
-    }
+    } catch { alert('Failed to update status.'); }
+    finally { setUpdating(null); }
   };
 
   const filtered = orders.filter(o => {
-    const matchesFilter = filter === 'all' || o.status === filter;
-    const matchesSearch = search === '' ||
-      o.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-      o.customer_email?.toLowerCase().includes(search.toLowerCase()) ||
-      String(o.id).includes(search);
-    return matchesFilter && matchesSearch;
+    const matchFilter = filter === 'all' || o.status === filter;
+    const matchSearch = !search || o.customer_name?.toLowerCase().includes(search.toLowerCase()) || String(o.id).includes(search);
+    return matchFilter && matchSearch;
   });
 
-  const counts = STATUSES.reduce((acc, s) => {
-    acc[s] = orders.filter(o => o.status === s).length;
-    return acc;
-  }, {});
-
-  const formatDate = (d) => new Date(d).toLocaleDateString('en-KE', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-  });
+  const counts = STATUSES.reduce((acc, s) => { acc[s] = orders.filter(o => o.status === s).length; return acc; }, {});
+  const formatDate = (d) => new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div className="min-h-screen page-shell">
-      {/* Navbar */}
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🐔</span>
-          <span className="font-bold text-green-700 text-lg">Kenchic Staff</span>
+    <PageWrapper>
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>All Orders</h1>
+          <p style={styles.sub}>{orders.length} total orders across all portals</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/employee/orders')} className="text-sm font-medium text-green-700">Orders</button>
-          <button onClick={() => navigate('/employee/stock')} className="text-sm text-gray-600 hover:text-green-700">Stock</button>
-          <button onClick={() => navigate('/employee/deliveries')} className="text-sm text-gray-600 hover:text-green-700">Deliveries</button>
-          <button onClick={() => navigate('/employee/reports')} className="text-sm text-gray-600 hover:text-green-700">Reports</button>
-          <button onClick={() => { logout(); navigate('/login'); }} className="text-sm text-gray-500 hover:text-red-600">Logout</button>
-        </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">All Orders</h1>
-            <p className="text-gray-500 mt-1">{orders.length} total orders</p>
-          </div>
-          <button onClick={fetchOrders} className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 text-gray-600">
-            🔄 Refresh
-          </button>
-        </div>
-
-        {/* Status summary cards */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
-          {STATUSES.map(s => (
-            <button
-              key={s}
-              onClick={() => setFilter(filter === s ? 'all' : s)}
-              className={`rounded-xl p-3 text-center border transition-all ${
-                filter === s ? 'ring-2 ring-green-500 border-green-300' : 'bg-white border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <p className={`text-lg font-bold ${STATUS_STYLES[s].split(' ')[1]}`}>{counts[s] || 0}</p>
-              <p className="text-xs text-gray-500 capitalize mt-0.5">{s}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Search + filter */}
-        <div className="flex gap-3 mb-6">
-          <input
-            type="text"
-            placeholder="Search by customer name, email or order ID..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="all">All statuses</option>
-            {STATUSES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
-          </select>
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-4">{error}</div>
-        )}
-
-        {/* Orders table */}
-        {!loading && !error && (
-          <>
-            {filtered.length === 0 ? (
-              <div className="bg-white rounded-xl border p-16 text-center text-gray-400">
-                No orders found
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Order</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Customer</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Type</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Total</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Status</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Update</th>
-                      <th className="text-left px-5 py-3 font-medium text-gray-600">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filtered.map(order => (
-                      <>
-                        <tr
-                          key={order.id}
-                          className="hover:bg-gray-50 cursor-pointer transition-colors"
-                          onClick={() => setExpanded(expanded === order.id ? null : order.id)}
-                        >
-                          <td className="px-5 py-4 font-medium text-gray-800">#{order.id}</td>
-                          <td className="px-5 py-4">
-                            <p className="font-medium text-gray-800">{order.customer_name}</p>
-                            <p className="text-xs text-gray-400">{order.customer_email}</p>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className="capitalize text-gray-600">{order.order_type}</span>
-                          </td>
-                          <td className="px-5 py-4 font-semibold text-green-700">
-                            KSh {Number(order.total_amount).toLocaleString()}
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${STATUS_STYLES[order.status]}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                            <select
-                              value={order.status}
-                              onChange={e => handleStatusChange(order.id, e.target.value)}
-                              disabled={updating === order.id}
-                              className="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:opacity-50"
-                            >
-                              {STATUSES.map(s => (
-                                <option key={s} value={s} className="capitalize">{s}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-5 py-4 text-gray-500 text-xs">{formatDate(order.created_at)}</td>
-                        </tr>
-                        {expanded === order.id && (
-                          <tr key={`${order.id}-detail`} className="bg-blue-50">
-                            <td colSpan={7} className="px-5 py-4">
-                              <div className="text-sm text-gray-700">
-                                <p><span className="font-medium">Delivery address:</span> {order.delivery_address || 'Pickup — no address provided'}</p>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
+        <button onClick={fetchOrders} style={styles.refreshBtn}>🔄 Refresh</button>
       </div>
-    </div>
+
+      {/* Status cards */}
+      <div style={styles.statusCards}>
+        {STATUSES.map(s => {
+          const st = STATUS_STYLES[s];
+          return (
+            <button key={s} onClick={() => setFilter(filter === s ? 'all' : s)}
+              style={{ ...styles.statusCard, ...(filter === s ? { ...styles.statusCardActive, borderColor: st.color } : {}) }}>
+              <p style={{ fontSize: '22px', fontWeight: 700, color: st.color }}>{counts[s] || 0}</p>
+              <p style={{ fontSize: '11px', color: '#78716c', textTransform: 'capitalize', marginTop: '2px' }}>{s}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search + filter */}
+      <div style={styles.filterRow}>
+        <div style={styles.searchWrap}>
+          <span>🔍</span>
+          <input type="text" placeholder="Search by customer name or order ID..." value={search} onChange={e => setSearch(e.target.value)} style={styles.searchInput} />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={styles.select}>
+          <option value="all">All statuses</option>
+          {STATUSES.map(s => <option key={s} value={s} style={{ textTransform: 'capitalize' }}>{s}</option>)}
+        </select>
+      </div>
+
+      {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
+      {error && <div style={styles.errorBox}>{error}</div>}
+
+      {!loading && !error && (
+        <div style={styles.tableWrap}>
+          {filtered.length === 0 ? (
+            <div style={styles.emptyState}><p style={{ fontSize: '48px' }}>📋</p><p style={{ color: '#a8a29e', marginTop: '12px' }}>No orders found</p></div>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.thead}>
+                  {['Order', 'Customer', 'Type', 'Total', 'Status', 'Update', 'Date'].map(h => (
+                    <th key={h} style={styles.th}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(order => {
+                  const st = STATUS_STYLES[order.status] || STATUS_STYLES.pending;
+                  return (
+                    <>
+                      <tr key={order.id} style={styles.tr} onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
+                        <td style={styles.td}><span style={styles.orderId}>#{order.id}</span></td>
+                        <td style={styles.td}>
+                          <p style={{ fontWeight: 600, color: '#1c0a00', fontSize: '14px' }}>{order.customer_name}</p>
+                          <p style={{ fontSize: '12px', color: '#a8a29e' }}>{order.customer_email}</p>
+                        </td>
+                        <td style={styles.td}><span style={styles.typeBadge}>{order.order_type}</span></td>
+                        <td style={styles.td}><span style={styles.amount}>KSh {Number(order.total_amount).toLocaleString()}</span></td>
+                        <td style={styles.td}>
+                          <span style={{ ...styles.statusBadge, color: st.color, background: st.bg }}>{order.status}</span>
+                        </td>
+                        <td style={styles.td} onClick={e => e.stopPropagation()}>
+                          <select value={order.status} onChange={e => handleStatusChange(order.id, e.target.value)} disabled={updating === order.id} style={styles.statusSelect}>
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                        <td style={styles.td}><span style={{ fontSize: '12px', color: '#a8a29e' }}>{formatDate(order.created_at)}</span></td>
+                      </tr>
+                      {expanded === order.id && (
+                        <tr key={`${order.id}-detail`}>
+                          <td colSpan={7} style={styles.expandedRow}>
+                            <span style={{ fontWeight: 500, color: '#44403c' }}>📍 {order.delivery_address || 'Pickup — no address'}</span>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } input:focus, select:focus { outline: none; }`}</style>
+    </PageWrapper>
   );
 }
+
+const styles = {
+  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px' },
+  title: { fontFamily: "'Playfair Display', serif", fontSize: '28px', fontWeight: 700, color: '#1c0a00' },
+  sub: { fontSize: '14px', color: '#78716c', marginTop: '4px' },
+  refreshBtn: { background: '#fff', border: '1.5px solid #e7e5e4', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', fontWeight: 500, color: '#44403c', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
+  statusCards: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '20px' },
+  statusCard: { background: '#fff', border: '1.5px solid #ede8e0', borderRadius: '12px', padding: '14px 10px', textAlign: 'center', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif', transition: 'all 0.15s" },
+  statusCardActive: { background: '#fff7ed', boxShadow: '0 2px 8px rgba(217,119,6,0.15)' },
+  filterRow: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
+  searchWrap: { display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', border: '1.5px solid #e7e5e4', borderRadius: '12px', padding: '0 16px', flex: 1, minWidth: '200px' },
+  searchInput: { border: 'none', background: 'transparent', padding: '12px 0', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', width: '100%' },
+  select: { border: '1.5px solid #e7e5e4', borderRadius: '12px', padding: '10px 16px', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#44403c', background: '#fff', cursor: 'pointer' },
+  tableWrap: { background: '#fff', borderRadius: '16px', border: '1px solid #ede8e0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
+  thead: { background: '#faf8f5', borderBottom: '1px solid #ede8e0' },
+  th: { padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  tr: { borderBottom: '1px solid #f5f0ea', cursor: 'pointer', transition: 'background 0.1s' },
+  td: { padding: '14px 16px', verticalAlign: 'middle' },
+  orderId: { fontWeight: 700, color: '#d97706', fontSize: '14px' },
+  typeBadge: { fontSize: '12px', color: '#78716c', background: '#f5f0ea', padding: '3px 10px', borderRadius: '100px', textTransform: 'capitalize' },
+  amount: { fontWeight: 700, color: '#92400e', fontSize: '14px' },
+  statusBadge: { fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '100px', textTransform: 'capitalize' },
+  statusSelect: { border: '1.5px solid #e7e5e4', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', fontFamily: "'DM Sans', sans-serif", color: '#44403c', background: '#fff', cursor: 'pointer' },
+  expandedRow: { padding: '12px 16px', background: '#faf8f5', fontSize: '13px' },
+  emptyState: { padding: '60px', textAlign: 'center' },
+  center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
+  spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px', marginBottom: '16px' },
+};

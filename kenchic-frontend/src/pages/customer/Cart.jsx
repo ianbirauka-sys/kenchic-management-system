@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { placeOrder } from '../../api/customer.api';
 import { initiatePayment, checkPaymentStatus } from '../../api/payment.api';
 import { useAuth } from '../../context/AuthContext';
+import PageWrapper from '../../components/PageWrapper';
+
+const CATEGORY_EMOJI = { chicks: '🐣', poultry: '🍗', feed: '🌾', equipment: '🔧' };
 
 export default function Cart() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('cart');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [step, setStep] = useState('cart'); // cart | checkout | payment | polling | confirmation
+  const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('cart') || '[]'));
+  const [step, setStep] = useState('cart');
   const [orderType, setOrderType] = useState('delivery');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,11 +21,12 @@ export default function Cart() {
   const [checkoutRequestId, setCheckoutRequestId] = useState(null);
   const [pollCount, setPollCount] = useState(0);
 
+  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
   const updateQty = (id, delta) => {
     setCart(prev => {
-      const updated = prev
-        .map(i => i.id === id ? { ...i, quantity: i.quantity + delta } : i)
-        .filter(i => i.quantity > 0);
+      const updated = prev.map(i => i.id === id ? { ...i, quantity: i.quantity + delta } : i).filter(i => i.quantity > 0);
       localStorage.setItem('cart', JSON.stringify(updated));
       return updated;
     });
@@ -39,307 +40,291 @@ export default function Cart() {
     });
   };
 
-  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-
-  // Step 1 — place order then move to payment
   const handleCheckout = async () => {
-    if (orderType === 'delivery' && !address.trim()) {
-      setError('Please enter a delivery address');
-      return;
-    }
-    setError('');
-    setLoading(true);
+    if (orderType === 'delivery' && !address.trim()) { setError('Please enter a delivery address'); return; }
+    setError(''); setLoading(true);
     try {
-      const items = cart.map(i => ({
-        product_id: i.id,
-        quantity: i.quantity,
-        unit_price: i.price,
-      }));
+      const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price }));
       const res = await placeOrder({ items, delivery_address: address, order_type: orderType });
       setOrderId(res.data.data.order_id);
       localStorage.removeItem('cart');
       setCart([]);
       setStep('payment');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to place order. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      setError(err.response?.data?.message || 'Failed to place order.');
+    } finally { setLoading(false); }
   };
 
-  // Step 2 — send STK push
   const handlePayment = async () => {
-    if (!phone.trim()) {
-      setError('Please enter your M-Pesa phone number');
-      return;
-    }
-    setError('');
-    setLoading(true);
+    if (!phone.trim()) { setError('Please enter your M-Pesa phone number'); return; }
+    setError(''); setLoading(true);
     try {
       const res = await initiatePayment({ order_id: orderId, phone_number: phone });
       setCheckoutRequestId(res.data.data.checkout_request_id);
       setStep('polling');
       pollPaymentStatus(res.data.data.checkout_request_id, 0);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to initiate payment. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      setError(err.response?.data?.message || 'Failed to initiate payment.');
+    } finally { setLoading(false); }
   };
 
-  // Step 3 — poll every 5s for up to 60s
   const pollPaymentStatus = (reqId, count) => {
-    if (count >= 12) {
-      setStep('payment');
-      setError('Payment timed out. Please try again.');
-      return;
-    }
+    if (count >= 12) { setStep('payment'); setError('Payment timed out. Please try again.'); return; }
     setPollCount(count);
     setTimeout(async () => {
       try {
         const res = await checkPaymentStatus(reqId);
         const status = res.data.data.status;
-        if (status === 'completed') {
-          setStep('confirmation');
-        } else if (status === 'failed') {
-          setStep('payment');
-          setError('Payment failed or was cancelled. Please try again.');
-        } else {
-          pollPaymentStatus(reqId, count + 1);
-        }
-      } catch {
-        pollPaymentStatus(reqId, count + 1);
-      }
+        if (status === 'completed') setStep('confirmation');
+        else if (status === 'failed') { setStep('payment'); setError('Payment failed. Please try again.'); }
+        else pollPaymentStatus(reqId, count + 1);
+      } catch { pollPaymentStatus(reqId, count + 1); }
     }, 5000);
   };
 
-  // ── Navbar ────────────────────────────────────────────────────────────────
-  const Navbar = () => (
-    <nav className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-      <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/customer/products')}>
-        <span className="text-2xl">🐔</span>
-        <span className="font-bold text-green-700 text-lg">Kenchic</span>
-      </div>
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/customer/products')} className="text-sm text-gray-600 hover:text-green-700">Products</button>
-        <button onClick={() => navigate('/customer/orders')} className="text-sm text-gray-600 hover:text-green-700">My Orders</button>
-        <div className="relative">
-          <button className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium">🛒 Cart</button>
-          {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cartCount}</span>
-          )}
+  // ── Confirmation ──────────────────────────────────────────────────────────
+  if (step === 'confirmation') return (
+    <PageWrapper cartCount={0}>
+      <div style={styles.centerPage}>
+        <div style={styles.resultCard}>
+          <div style={styles.resultIcon}>🎉</div>
+          <h1 style={styles.resultTitle}>Payment Successful!</h1>
+          <p style={styles.resultSub}>Your M-Pesa payment was received and your order is confirmed.</p>
+          <div style={styles.orderIdBadge}>Order #{orderId}</div>
+          <div style={styles.resultActions}>
+            <button onClick={() => navigate('/customer/orders')} style={styles.primaryBtn}>Track Order</button>
+            <button onClick={() => navigate('/customer/products')} style={styles.outlineBtn}>Continue Shopping</button>
+          </div>
         </div>
-        <button onClick={() => { logout(); navigate('/login'); }} className="text-sm text-gray-500 hover:text-red-600">Logout</button>
       </div>
-    </nav>
+    </PageWrapper>
   );
 
-  // ── Confirmation ──────────────────────────────────────────────────────────
-  if (step === 'confirmation') {
-    return (
-      <div className="min-h-screen page-shell">
-        <Navbar />
-        <div className="max-w-lg mx-auto px-6 py-20 text-center">
-          <div className="bg-white rounded-2xl shadow p-10">
-            <div className="text-6xl mb-4">🎉</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Payment Successful!</h1>
-            <p className="text-gray-500 mb-2">Your M-Pesa payment was received and your order is confirmed.</p>
-            <p className="text-green-700 font-semibold mb-6">Order ID: #{orderId}</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => navigate('/customer/orders')} className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700">Track Order</button>
-              <button onClick={() => navigate('/customer/products')} className="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-50">Continue Shopping</button>
-            </div>
+  // ── Polling ───────────────────────────────────────────────────────────────
+  if (step === 'polling') return (
+    <PageWrapper cartCount={0}>
+      <div style={styles.centerPage}>
+        <div style={styles.resultCard}>
+          <div style={styles.resultIcon}>📱</div>
+          <h1 style={styles.resultTitle}>Check your phone</h1>
+          <p style={styles.resultSub}>An M-Pesa prompt has been sent to <strong>{phone}</strong>. Enter your PIN to complete payment.</p>
+          <div style={styles.pollingRow}>
+            <div style={styles.spinner} />
+            <span style={{ fontSize: '14px', color: '#78716c' }}>Waiting for confirmation...</span>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Polling Screen ────────────────────────────────────────────────────────
-  if (step === 'polling') {
-    return (
-      <div className="min-h-screen page-shell">
-        <Navbar />
-        <div className="max-w-lg mx-auto px-6 py-20 text-center">
-          <div className="bg-white rounded-2xl shadow p-10">
-            <div className="text-6xl mb-6">📱</div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">Check your phone</h1>
-            <p className="text-gray-500 mb-6">
-              An M-Pesa prompt has been sent to <span className="font-semibold text-gray-700">{phone}</span>. Enter your PIN to complete the payment.
-            </p>
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-4 border-green-500 border-t-transparent"></div>
-              <span className="text-sm text-gray-500">Waiting for confirmation...</span>
-            </div>
-            <div className="flex justify-center gap-1 mb-6">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className={`w-2 h-2 rounded-full ${i < pollCount ? 'bg-green-500' : 'bg-gray-200'}`} />
-              ))}
-            </div>
-            <p className="text-xs text-gray-400">Amount: <span className="font-semibold">KSh {total.toLocaleString()}</span> · Order #{orderId}</p>
-            <button onClick={() => { setStep('payment'); setError(''); }} className="mt-6 text-sm text-gray-400 hover:text-gray-600 underline">
-              Cancel and try again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Payment Step ──────────────────────────────────────────────────────────
-  if (step === 'payment') {
-    return (
-      <div className="min-h-screen page-shell">
-        <Navbar />
-        <div className="max-w-lg mx-auto px-6 py-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">Pay with M-Pesa</h1>
-          <div className="bg-white rounded-xl shadow-sm border p-6 mb-4">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b">
-              <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center text-white font-bold text-xl">M</div>
-              <div>
-                <p className="font-semibold text-gray-800">M-Pesa STK Push</p>
-                <p className="text-sm text-gray-500">You will receive a prompt on your phone</p>
-              </div>
-            </div>
-            <div className="bg-green-50 rounded-lg px-4 py-3 mb-6">
-              <p className="text-sm text-gray-500">Amount to pay</p>
-              <p className="text-2xl font-bold text-green-700">KSh {total.toLocaleString()}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Order #{orderId}</p>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">M-Pesa phone number</label>
-              <div className="flex gap-2">
-                <div className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 flex items-center">🇰🇪 +254</div>
-                <input
-                  type="tel"
-                  placeholder="0712 345 678"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Enter the Safaricom number registered for M-Pesa</p>
-            </div>
-            {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-            <button
-              onClick={handlePayment}
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> Sending prompt...</>
-              ) : <>📱 Send M-Pesa Prompt</>}
-            </button>
-          </div>
-          <p className="text-xs text-center text-gray-400">Secured by Safaricom M-Pesa. Your PIN is never shared with Kenchic.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Checkout Step ─────────────────────────────────────────────────────────
-  if (step === 'checkout') {
-    return (
-      <div className="min-h-screen page-shell">
-        <Navbar />
-        <div className="max-w-2xl mx-auto px-6 py-8">
-          <button onClick={() => setStep('cart')} className="text-sm text-gray-500 hover:text-green-700 mb-4">← Back to cart</button>
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">Checkout</h1>
-          <div className="bg-white rounded-xl shadow-sm border p-6 mb-4">
-            <h2 className="font-semibold text-gray-700 mb-4">Delivery options</h2>
-            <div className="flex gap-4 mb-4">
-              <label className={`flex-1 border-2 rounded-lg p-4 cursor-pointer transition-colors ${orderType === 'delivery' ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
-                <input type="radio" name="orderType" value="delivery" checked={orderType === 'delivery'} onChange={() => setOrderType('delivery')} className="sr-only" />
-                <div className="text-2xl mb-1">🚚</div>
-                <div className="font-medium text-gray-800">Delivery</div>
-                <div className="text-sm text-gray-500">Delivered to your address</div>
-              </label>
-              <label className={`flex-1 border-2 rounded-lg p-4 cursor-pointer transition-colors ${orderType === 'pickup' ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
-                <input type="radio" name="orderType" value="pickup" checked={orderType === 'pickup'} onChange={() => setOrderType('pickup')} className="sr-only" />
-                <div className="text-2xl mb-1">🏪</div>
-                <div className="font-medium text-gray-800">Pickup</div>
-                <div className="text-sm text-gray-500">Collect from our outlet</div>
-              </label>
-            </div>
-            {orderType === 'delivery' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery address</label>
-                <textarea rows={3} placeholder="Enter your full delivery address..." value={address} onChange={e => setAddress(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-              </div>
-            )}
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-6 mb-4">
-            <h2 className="font-semibold text-gray-700 mb-4">Order summary</h2>
-            {cart.map(item => (
-              <div key={item.id} className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>{item.name} × {item.quantity}</span>
-                <span>KSh {(item.price * item.quantity).toLocaleString()}</span>
-              </div>
+          <div style={styles.dots}>
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} style={{ ...styles.dot, background: i < pollCount ? '#d97706' : '#e7e5e4' }} />
             ))}
-            <div className="border-t mt-4 pt-4 flex justify-between font-bold text-gray-800">
-              <span>Total</span>
-              <span className="text-green-700">KSh {total.toLocaleString()}</span>
-            </div>
           </div>
-          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-          <button onClick={handleCheckout} disabled={loading} className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50">
-            {loading ? 'Processing...' : `Continue to Payment — KSh ${total.toLocaleString()}`}
+          <p style={{ fontSize: '13px', color: '#a8a29e', marginTop: '8px' }}>
+            KSh {total.toLocaleString()} · Order #{orderId}
+          </p>
+          <button onClick={() => { setStep('payment'); setError(''); }} style={{ ...styles.outlineBtn, marginTop: '20px' }}>
+            Cancel and try again
           </button>
         </div>
       </div>
-    );
-  }
+    </PageWrapper>
+  );
 
-  // ── Cart Step ─────────────────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen page-shell">
-      <Navbar />
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Your Cart</h1>
-        {cart.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border p-16 text-center">
-            <div className="text-5xl mb-4">🛒</div>
-            <p className="text-gray-500 mb-4">Your cart is empty</p>
-            <button onClick={() => navigate('/customer/products')} className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700">Browse Products</button>
+  // ── Payment ───────────────────────────────────────────────────────────────
+  if (step === 'payment') return (
+    <PageWrapper cartCount={0}>
+      <div style={styles.narrowPage}>
+        <button onClick={() => setStep('checkout')} style={styles.backBtn}>← Back</button>
+        <h1 style={styles.pageTitle}>Pay with M-Pesa</h1>
+        <div style={styles.payCard}>
+          <div style={styles.mpesaHeader}>
+            <div style={styles.mpesaLogo}>M</div>
+            <div>
+              <p style={{ fontWeight: 600, color: '#1c0a00', fontSize: '15px' }}>M-Pesa STK Push</p>
+              <p style={{ fontSize: '13px', color: '#78716c' }}>You will receive a prompt on your phone</p>
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="bg-white rounded-xl shadow-sm border divide-y mb-4">
+          <div style={styles.amountBox}>
+            <p style={{ fontSize: '13px', color: '#78716c' }}>Amount to pay</p>
+            <p style={styles.amountFig}>KSh {total.toLocaleString()}</p>
+            <p style={{ fontSize: '12px', color: '#a8a29e' }}>Order #{orderId}</p>
+          </div>
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>M-Pesa phone number</label>
+            <div style={styles.phoneRow}>
+              <div style={styles.countryCode}>🇰🇪 +254</div>
+              <input
+                type="tel" placeholder="0712 345 678"
+                value={phone} onChange={e => setPhone(e.target.value)}
+                style={styles.phoneInput}
+              />
+            </div>
+            <p style={{ fontSize: '12px', color: '#a8a29e', marginTop: '4px' }}>Enter the Safaricom number registered for M-Pesa</p>
+          </div>
+          {error && <p style={styles.errorText}>{error}</p>}
+          <button onClick={handlePayment} disabled={loading} style={{ ...styles.primaryBtn, width: '100%', marginTop: '8px' }}>
+            {loading ? 'Sending prompt...' : '📱 Send M-Pesa Prompt'}
+          </button>
+        </div>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: '#a8a29e', marginTop: '16px' }}>
+          Secured by Safaricom M-Pesa. Your PIN is never shared with Kenchic.
+        </p>
+      </div>
+    </PageWrapper>
+  );
+
+  // ── Checkout ──────────────────────────────────────────────────────────────
+  if (step === 'checkout') return (
+    <PageWrapper cartCount={cartCount}>
+      <div style={styles.narrowPage}>
+        <button onClick={() => setStep('cart')} style={styles.backBtn}>← Back to cart</button>
+        <h1 style={styles.pageTitle}>Checkout</h1>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Delivery options</h2>
+          <div style={styles.toggleRow}>
+            {[{ value: 'delivery', icon: '🚚', label: 'Delivery', desc: 'Delivered to your address' },
+              { value: 'pickup', icon: '🏪', label: 'Pickup', desc: 'Collect from our outlet' }].map(opt => (
+              <label key={opt.value} style={{ ...styles.toggleOpt, ...(orderType === opt.value ? styles.toggleOptActive : {}) }}>
+                <input type="radio" name="orderType" value={opt.value} checked={orderType === opt.value} onChange={() => setOrderType(opt.value)} style={{ display: 'none' }} />
+                <span style={{ fontSize: '28px' }}>{opt.icon}</span>
+                <span style={{ fontWeight: 600, color: '#1c0a00', fontSize: '15px' }}>{opt.label}</span>
+                <span style={{ fontSize: '12px', color: '#78716c' }}>{opt.desc}</span>
+              </label>
+            ))}
+          </div>
+          {orderType === 'delivery' && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Delivery address</label>
+              <textarea rows={3} placeholder="Enter your full delivery address..."
+                value={address} onChange={e => setAddress(e.target.value)}
+                style={styles.textarea} />
+            </div>
+          )}
+        </div>
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Order summary</h2>
+          {cart.map(item => (
+            <div key={item.id} style={styles.summaryRow}>
+              <span style={{ color: '#44403c' }}>{item.name} × {item.quantity}</span>
+              <span style={{ fontWeight: 600, color: '#92400e' }}>KSh {(item.price * item.quantity).toLocaleString()}</span>
+            </div>
+          ))}
+          <div style={styles.totalRow}>
+            <span>Total</span>
+            <span style={{ color: '#92400e', fontSize: '20px' }}>KSh {total.toLocaleString()}</span>
+          </div>
+        </div>
+        {error && <p style={styles.errorText}>{error}</p>}
+        <button onClick={handleCheckout} disabled={loading} style={{ ...styles.primaryBtn, width: '100%' }}>
+          {loading ? 'Processing...' : `Continue to Payment — KSh ${total.toLocaleString()}`}
+        </button>
+      </div>
+    </PageWrapper>
+  );
+
+  // ── Cart ──────────────────────────────────────────────────────────────────
+  return (
+    <PageWrapper cartCount={cartCount}>
+      <h1 style={styles.pageTitle}>Your Cart</h1>
+      {cart.length === 0 ? (
+        <div style={styles.emptyState}>
+          <p style={{ fontSize: '56px' }}>🛒</p>
+          <p style={{ fontSize: '18px', fontWeight: 600, color: '#44403c', marginTop: '16px' }}>Your cart is empty</p>
+          <p style={{ fontSize: '14px', color: '#a8a29e', margin: '8px 0 24px' }}>Browse our products and add items to get started</p>
+          <button onClick={() => navigate('/customer/products')} style={styles.primaryBtn}>Browse Products</button>
+        </div>
+      ) : (
+        <div style={styles.cartLayout}>
+          {/* Items */}
+          <div style={styles.itemsCol}>
+            <div style={styles.section}>
               {cart.map(item => (
-                <div key={item.id} className="flex items-center gap-4 p-4">
-                  <div className="bg-green-50 rounded-lg w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">
-                    {item.category === 'chicks' ? '🐣' : item.category === 'feed' ? '🌾' : '🍗'}
+                <div key={item.id} style={styles.cartItem}>
+                  <div style={styles.itemImg}>
+                    <span style={{ fontSize: '28px' }}>{CATEGORY_EMOJI[item.category] || '📦'}</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{item.name}</p>
-                    <p className="text-sm text-gray-500">KSh {Number(item.price).toLocaleString()} each</p>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600, color: '#1c0a00', fontSize: '15px' }}>{item.name}</p>
+                    <p style={{ fontSize: '13px', color: '#78716c', marginTop: '2px' }}>KSh {Number(item.price).toLocaleString()} each</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => updateQty(item.id, -1)} className="w-8 h-8 rounded-full border flex items-center justify-center text-gray-600 hover:bg-gray-100">−</button>
-                    <span className="w-6 text-center font-medium">{item.quantity}</span>
-                    <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 rounded-full border flex items-center justify-center text-gray-600 hover:bg-gray-100">+</button>
+                  <div style={styles.qtyRow}>
+                    <button onClick={() => updateQty(item.id, -1)} style={styles.qtyBtn}>−</button>
+                    <span style={{ fontWeight: 600, color: '#1c0a00', minWidth: '24px', textAlign: 'center' }}>{item.quantity}</span>
+                    <button onClick={() => updateQty(item.id, 1)} style={styles.qtyBtn}>+</button>
                   </div>
-                  <p className="font-semibold text-green-700 w-24 text-right">KSh {(item.price * item.quantity).toLocaleString()}</p>
-                  <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500 ml-2">✕</button>
+                  <p style={{ fontWeight: 700, color: '#92400e', fontSize: '16px', minWidth: '100px', textAlign: 'right' }}>
+                    KSh {(item.price * item.quantity).toLocaleString()}
+                  </p>
+                  <button onClick={() => removeItem(item.id)} style={styles.removeBtn}>✕</button>
                 </div>
               ))}
             </div>
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="flex justify-between text-lg font-bold text-gray-800 mb-4">
+          </div>
+
+          {/* Summary */}
+          <div style={styles.summaryCol}>
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Order total</h2>
+              <div style={styles.totalRow}>
                 <span>Total</span>
-                <span className="text-green-700">KSh {total.toLocaleString()}</span>
+                <span style={{ color: '#92400e', fontSize: '22px' }}>KSh {total.toLocaleString()}</span>
               </div>
-              <button onClick={() => setStep('checkout')} className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+              <button onClick={() => setStep('checkout')} style={{ ...styles.primaryBtn, width: '100%', marginTop: '16px' }}>
                 Proceed to Checkout
               </button>
-              <button onClick={() => navigate('/customer/products')} className="w-full mt-2 border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50">
+              <button onClick={() => navigate('/customer/products')} style={{ ...styles.outlineBtn, width: '100%', marginTop: '10px' }}>
                 Continue Shopping
               </button>
             </div>
-          </>
-        )}
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </PageWrapper>
   );
 }
+
+const styles = {
+  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '28px', fontWeight: 700, color: '#1c0a00', marginBottom: '24px' },
+  backBtn: { background: 'none', border: 'none', color: '#78716c', fontSize: '14px', cursor: 'pointer', padding: '0 0 16px', fontFamily: "'DM Sans', sans-serif" },
+  narrowPage: { maxWidth: '560px', margin: '0 auto' },
+  centerPage: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' },
+  section: { background: '#fff', borderRadius: '16px', border: '1px solid #ede8e0', padding: '24px', marginBottom: '16px', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  sectionTitle: { fontSize: '16px', fontWeight: 600, color: '#1c0a00', marginBottom: '16px', fontFamily: "'DM Sans', sans-serif" },
+  cartLayout: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' },
+  itemsCol: {},
+  summaryCol: { position: 'sticky', top: '80px' },
+  cartItem: { display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 0', borderBottom: '1px solid #f5f0ea' },
+  itemImg: { width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #fde8c8, #fdba74)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  qtyRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+  qtyBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '1.5px solid #e7e5e4', background: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#44403c' },
+  removeBtn: { background: 'none', border: 'none', color: '#a8a29e', cursor: 'pointer', fontSize: '16px', padding: '4px', transition: 'color 0.15s' },
+  toggleRow: { display: 'flex', gap: '12px', marginBottom: '16px' },
+  toggleOpt: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '16px', border: '2px solid #e7e5e4', borderRadius: '14px', cursor: 'pointer', background: '#fafafa', transition: 'all 0.15s' },
+  toggleOptActive: { border: '2px solid #d97706', background: '#fff7ed', boxShadow: '0 4px 16px rgba(217,119,6,0.15)' },
+  summaryRow: { display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '10px' },
+  totalRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, fontSize: '17px', color: '#1c0a00', borderTop: '1px solid #f5f0ea', paddingTop: '16px', marginTop: '8px' },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: { fontSize: '13px', fontWeight: 600, color: '#44403c' },
+  textarea: { border: '1.5px solid #e7e5e4', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', resize: 'none', background: '#fafafa' },
+  primaryBtn: { background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', border: 'none', borderRadius: '12px', padding: '14px 24px', fontSize: '15px', fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", boxShadow: '0 4px 16px rgba(217,119,6,0.35)', display: 'inline-block', textAlign: 'center' },
+  outlineBtn: { background: '#fff', color: '#78716c', border: '1.5px solid #e7e5e4', borderRadius: '12px', padding: '13px 24px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", display: 'inline-block', textAlign: 'center' },
+  emptyState: { background: '#fff', borderRadius: '20px', border: '1px solid #ede8e0', padding: '80px 40px', textAlign: 'center', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  resultCard: { background: '#fff', borderRadius: '24px', padding: '48px 40px', textAlign: 'center', maxWidth: '460px', width: '100%', boxShadow: '0 8px 40px rgba(180,80,0,0.1)', border: '1px solid #ede8e0' },
+  resultIcon: { fontSize: '56px', marginBottom: '16px' },
+  resultTitle: { fontFamily: "'Playfair Display', serif", fontSize: '26px', fontWeight: 700, color: '#1c0a00', marginBottom: '8px' },
+  resultSub: { fontSize: '14px', color: '#78716c', marginBottom: '20px', lineHeight: 1.6 },
+  orderIdBadge: { background: '#fff7ed', color: '#d97706', fontWeight: 700, fontSize: '15px', padding: '8px 20px', borderRadius: '100px', display: 'inline-block', marginBottom: '24px' },
+  resultActions: { display: 'flex', gap: '12px', justifyContent: 'center' },
+  pollingRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', margin: '16px 0' },
+  dots: { display: 'flex', justifyContent: 'center', gap: '6px', margin: '8px 0' },
+  dot: { width: '8px', height: '8px', borderRadius: '50%' },
+  spinner: { width: '20px', height: '20px', border: '3px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  payCard: { background: '#fff', borderRadius: '16px', border: '1px solid #ede8e0', padding: '28px', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
+  mpesaHeader: { display: 'flex', alignItems: 'center', gap: '14px', paddingBottom: '20px', borderBottom: '1px solid #f5f0ea', marginBottom: '20px' },
+  mpesaLogo: { width: '48px', height: '48px', background: 'linear-gradient(135deg, #16a34a, #15803d)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '20px', fontWeight: 800 },
+  amountBox: { background: '#fff7ed', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' },
+  amountFig: { fontFamily: "'Playfair Display', serif", fontSize: '32px', fontWeight: 700, color: '#d97706', margin: '4px 0' },
+  phoneRow: { display: 'flex', gap: '8px' },
+  countryCode: { background: '#f5f0ea', border: '1.5px solid #e7e5e4', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#44403c', whiteSpace: 'nowrap' },
+  phoneInput: { flex: 1, border: '1.5px solid #e7e5e4', borderRadius: '10px', padding: '12px 16px', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', background: '#fafafa' },
+  errorText: { color: '#dc2626', fontSize: '13px', margin: '8px 0' },
+};

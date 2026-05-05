@@ -25,6 +25,11 @@ export default function Products() {
   }, []);
 
   const addToCart = (product) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
     setCart(prev => {
       const existing = prev.find(i => i.id === product.id);
       const updated = existing
@@ -44,8 +49,49 @@ export default function Products() {
     (p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
   );
 
-  return (
-    <PageWrapper cartCount={cartCount}>
+  const GuestNav = () => (
+    <nav style={guestNavStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+        <span style={{ fontSize: '28px' }}>🐔</span>
+        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '22px', fontWeight: 800, color: '#92400e' }}>
+          Kenchic<span style={{ color: '#d97706' }}>.</span>
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button onClick={() => navigate('/login')} style={guestLoginBtn}>Sign in</button>
+        <button onClick={() => navigate('/register')} style={guestRegisterBtn}>Register</button>
+      </div>
+    </nav>
+  );
+
+  const guestNavStyle = {
+    position: 'sticky', top: 0, zIndex: 100,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 32px', height: '64px',
+    background: 'rgba(255,255,255,0.97)',
+    backdropFilter: 'blur(12px)',
+    borderBottom: '1px solid #f3ede6',
+    boxShadow: '0 2px 16px rgba(180,80,0,0.06)',
+    fontFamily: "'DM Sans', sans-serif",
+  };
+
+  const guestLoginBtn = {
+    background: 'none', border: '1.5px solid #e7e5e4',
+    borderRadius: '8px', padding: '7px 16px',
+    fontSize: '13px', fontWeight: 500, color: '#78716c',
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+  };
+
+  const guestRegisterBtn = {
+    background: 'linear-gradient(135deg, #d97706, #ea580c)',
+    color: '#fff', border: 'none', borderRadius: '8px',
+    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+    boxShadow: '0 2px 8px rgba(217,119,6,0.3)',
+  };
+
+  const productContent = (
+    <>
       {/* Hero banner */}
       <div style={styles.hero}>
         <div>
@@ -141,7 +187,22 @@ export default function Products() {
         @keyframes spin { to { transform: rotate(360deg); } }
         input:focus { outline: none; }
       `}</style>
-    </PageWrapper>
+    </>
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f0ea', fontFamily: "'DM Sans', sans-serif" }}>
+      {user ? (
+        <PageWrapper cartCount={cartCount}>{productContent}</PageWrapper>
+      ) : (
+        <>
+          <GuestNav />
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
+            {productContent}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
