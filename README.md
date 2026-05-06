@@ -13,6 +13,45 @@ A full-stack web platform for Kenchic with three portals: customer, farmer, and 
 
 ---
 
+## Features
+
+### Customer Portal
+- Browse and search products
+- Add items to cart with localStorage persistence
+- Secure checkout with M-Pesa integration
+- Order tracking and history
+- Customer support interface
+
+### Farmer Portal
+- Browse chick catalog
+- Place chick orders with multi-step checkout
+- Access farming resources and guides
+- Order tracking and management
+
+### Employee Portal
+- Order management and status updates
+- Stock level monitoring and updates
+- Delivery scheduling and tracking
+- Sales and inventory reports
+
+### UI/UX Highlights
+- Consistent hero sections across all portals with gradient backgrounds
+- Responsive design with mobile-first approach
+- Role-based navigation and access control
+- Modern card-based layouts with rounded corners
+- Professional typography using Playfair Display font
+
+---
+
+## Recent Updates
+
+- ✅ **UI Consistency**: Applied uniform hero section styling across all customer pages (Products, Cart, Order Tracking) matching the farmer portal design
+- ✅ **Cart Functionality**: Fixed localStorage key synchronization for persistent cart data
+- ✅ **Navigation**: Removed duplicate navbar components and ensured consistent PageWrapper usage
+- ✅ **Build Optimization**: Successful production builds with proper chunking and minification
+
+---
+
 ## Getting started
 
 ### 1. Clone the repo
@@ -101,3 +140,39 @@ kenchic-management-system/
         ├── components/ # Shared UI components
         └── pages/      # auth / customer / farmer / employee
 ```
+
+---
+
+## Development
+
+### Scripts
+```bash
+# Backend
+cd kenchic-backend
+npm run dev          # Start development server
+npm test            # Run tests
+
+# Frontend
+cd kenchic-frontend
+npm run dev         # Start development server
+npm run build       # Build for production
+npm run preview     # Preview production build
+```
+
+### Environment Variables
+- **Backend**: Create `.env` with DB credentials, JWT secret, and M-Pesa API keys
+- **Frontend**: Set `VITE_API_BASE_URL` to backend URL
+
+---
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+This project is part of BBIT 3.2 coursework at JKUAT.
