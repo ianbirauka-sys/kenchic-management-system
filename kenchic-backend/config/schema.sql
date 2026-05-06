@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS deliveries (
   FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 
+-- Inquiries (customer support)
+CREATE TABLE IF NOT EXISTS inquiries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(30),
+  inquiry_type VARCHAR(80) NOT NULL,
+  order_id INT,
+  message TEXT NOT NULL,
+  status ENUM('open', 'in_progress', 'resolved') DEFAULT 'open',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ─────────────────────────────────────────────
 -- Sample data for testing
 -- ─────────────────────────────────────────────

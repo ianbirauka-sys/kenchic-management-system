@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getProducts, getProductById, placeOrder, getMyOrders } = require('../controllers/customer.controller');
+const { getProducts, getProductById, placeOrder, getMyOrders, submitInquiry } = require('../controllers/customer.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
+
+// Public routes (no auth required)
+router.post('/inquiries', submitInquiry);
 
 // All customer routes require auth + customer role
 router.use(authMiddleware, roleMiddleware('customer'));

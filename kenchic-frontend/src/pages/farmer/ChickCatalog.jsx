@@ -41,7 +41,7 @@ export default function ChickCatalog() {
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <PageWrapper cartCount={0}>
+    <PageWrapper>
       {/* Hero */}
       <div style={styles.hero}>
         <div>

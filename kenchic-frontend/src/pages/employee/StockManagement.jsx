@@ -1,202 +1,724 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getStock, updateStock } from '../../api/employee.api';
-import PageWrapper from '../../components/PageWrapper';
+import { useState, useEffect } from "react";
+import { getStock, updateStock, addProduct } from "../../api/employee.api";
+import PageWrapper from "../../components/PageWrapper";
 
-const CATEGORY_EMOJI = { chicks: '🐣', poultry: '🍗', feed: '🌾', equipment: '🔧' };
-
-const getLevel = (qty) => {
-  if (qty === 0) return { label: 'Out of stock', color: '#dc2626', bg: '#fff5f5', bar: '#ef4444', pct: 0 };
-  if (qty <= 20)  return { label: 'Critical',     color: '#dc2626', bg: '#fff5f5', bar: '#f87171', pct: 10 };
-  if (qty <= 50)  return { label: 'Low',           color: '#d97706', bg: '#fff7ed', bar: '#fbbf24', pct: 30 };
-  if (qty <= 150) return { label: 'Medium',        color: '#1d4ed8', bg: '#eff6ff', bar: '#60a5fa', pct: 65 };
-  return           { label: 'Good',               color: '#15803d', bg: '#f0fdf4', bar: '#4ade80', pct: 100 };
-};
+const CATEGORIES = ["Whole Chicken", "Chicken Parts", "Processed", "Chicks", "Other"];
 
 export default function StockManagement() {
-  const [stock, setStock] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [newQty, setNewQty] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [successId, setSuccessId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editQty, setEditQty] = useState("");
+  const [savingId, setSavingId] = useState(null);
 
-  useEffect(() => { fetchStock(); }, []);
+  // Add-new-product modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    stock_quantity: "",
+  });
+  const [addStatus, setAddStatus] = useState("idle"); // idle | submitting | success | error
+  const [addError, setAddError] = useState("");
 
-  const fetchStock = () => {
+  const [toast, setToast] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("All");
+
+  useEffect(() => {
+    loadStock();
+  }, []);
+
+  const loadStock = () => {
     setLoading(true);
     getStock()
-      .then(res => setStock(res.data.data))
-      .catch(() => setError('Failed to load stock.'))
+      .then((res) => setProducts(res.data?.data || res.data || []))
+      .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   };
 
-  const handleSave = async (id) => {
-    if (newQty === '' || isNaN(newQty) || Number(newQty) < 0) { alert('Please enter a valid quantity.'); return; }
-    setSaving(true);
-    try {
-      await updateStock(id, Number(newQty));
-      setStock(prev => prev.map(i => i.id === id ? { ...i, stock_quantity: Number(newQty) } : i));
-      setEditing(null);
-      setSuccessId(id);
-      setTimeout(() => setSuccessId(null), 2000);
-    } catch { alert('Failed to update stock.'); }
-    finally { setSaving(false); }
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const filtered = stock.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.category.toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Edit existing quantity ──
+  const handleSaveQty = async (product) => {
+    const qty = parseInt(editQty, 10);
+    if (isNaN(qty) || qty < 0) {
+      showToast("Enter a valid quantity (0 or more).", "error");
+      return;
+    }
+    setSavingId(product.id);
+    try {
+      await updateStock(product.id, { stock_quantity: qty });
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, stock_quantity: qty } : p))
+      );
+      setEditingId(null);
+      showToast(`${product.name} updated to ${qty} units.`);
+    } catch {
+      showToast("Failed to update stock.", "error");
+    } finally {
+      setSavingId(null);
+    }
+  };
 
-  const totalValue = stock.reduce((sum, i) => sum + i.price * i.stock_quantity, 0);
-  const lowCount = stock.filter(i => i.stock_quantity > 0 && i.stock_quantity <= 50).length;
-  const outCount = stock.filter(i => i.stock_quantity === 0).length;
+  // ── Add new product ──
+  const handleAddProduct = async () => {
+    const { name, price, stock_quantity, category } = newProduct;
+    if (!name.trim() || !price || !stock_quantity || !category) {
+      setAddError("Name, price, category, and initial stock are required.");
+      return;
+    }
+    if (isNaN(Number(price)) || Number(price) <= 0) {
+      setAddError("Price must be a positive number.");
+      return;
+    }
+    if (isNaN(Number(stock_quantity)) || Number(stock_quantity) < 0) {
+      setAddError("Stock quantity must be 0 or more.");
+      return;
+    }
+    setAddError("");
+    setAddStatus("submitting");
+    try {
+      const payload = {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stock_quantity: parseInt(newProduct.stock_quantity, 10),
+      };
+      const res = await addProduct(payload);
+      const created = res.data?.data || res.data;
+      setProducts((prev) => [...prev, created]);
+      setAddStatus("success");
+      showToast(`"${newProduct.name}" added to catalog!`);
+      setTimeout(() => {
+        setShowAddModal(false);
+        setAddStatus("idle");
+        setNewProduct({ name: "", description: "", price: "", category: "", stock_quantity: "" });
+      }, 1200);
+    } catch (err) {
+      setAddError(err.response?.data?.message || "Failed to add product.");
+      setAddStatus("error");
+    }
+  };
+
+  const allCategories = [
+    "All",
+    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
+  ];
+
+  const filtered = products.filter((p) => {
+    const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase());
+    const matchCat = filterCat === "All" || p.category === filterCat;
+    return matchSearch && matchCat;
+  });
+
+  const stockStats = {
+    total: products.length,
+    lowStock: products.filter((p) => p.stock_quantity <= 10).length,
+    outOfStock: products.filter((p) => p.stock_quantity === 0).length,
+  };
 
   return (
     <PageWrapper>
-      <div style={styles.header}>
+
+      {/* Hero */}
+      <div style={{
+        background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
+        borderRadius: '20px',
+        padding: '40px 48px',
+        marginBottom: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
         <div>
-          <h1 style={styles.title}>Stock Management</h1>
-          <p style={styles.sub}>View and update current inventory levels</p>
+          <p style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.8)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            marginBottom: '8px'
+          }}>
+            Inventory Control
+          </p>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '34px',
+            fontWeight: 700,
+            color: '#fff',
+            marginBottom: '8px'
+          }}>
+            Stock Management
+          </h1>
+          <p style={{
+            fontSize: '15px',
+            color: 'rgba(255,255,255,0.85)'
+          }}>
+            Monitor and update product inventory levels
+          </p>
         </div>
-        <button onClick={fetchStock} style={styles.refreshBtn}>🔄 Refresh</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              padding: "0.75rem 1.5rem",
+              background: "#fff",
+              color: "#7c3d12",
+              border: "none",
+              borderRadius: "10px",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "0.95rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            + Add New Product
+          </button>
+          <span style={{ fontSize: '80px', opacity: 0.9 }}>📦</span>
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div style={styles.summaryCards}>
-        <div style={styles.summaryCard}>
-          <p style={styles.summaryLabel}>Total inventory value</p>
-          <p style={{ ...styles.summaryValue, color: '#15803d' }}>KSh {totalValue.toLocaleString()}</p>
+      <div
+        style={{
+          maxWidth: "1100px",
+          margin: "0 auto",
+          padding: "2rem 1.5rem",
+        }}
+      >
+        {/* Stats row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "1rem",
+            marginBottom: "2rem",
+          }}
+        >
+          {[
+            { label: "Total Products", value: stockStats.total, color: "#7c3d12", bg: "#fef3c7" },
+            { label: "Low Stock (≤10)", value: stockStats.lowStock, color: "#b45309", bg: "#fee2e2" },
+            { label: "Out of Stock", value: stockStats.outOfStock, color: "#dc2626", bg: "#fee2e2" },
+          ].map(({ label, value, color, bg }) => (
+            <div
+              key={label}
+              style={{
+                background: bg,
+                borderRadius: "10px",
+                padding: "1.2rem 1.5rem",
+                border: `1px solid ${color}33`,
+              }}
+            >
+              <div style={{ fontSize: "1.8rem", fontWeight: 700, color }}>{value}</div>
+              <div style={{ fontSize: "0.85rem", color: "#555", marginTop: "0.2rem" }}>{label}</div>
+            </div>
+          ))}
         </div>
-        <div style={{ ...styles.summaryCard, ...(lowCount > 0 ? { background: '#fff7ed', borderColor: '#fed7aa' } : {}) }}>
-          <p style={styles.summaryLabel}>Low stock items</p>
-          <p style={{ ...styles.summaryValue, color: lowCount > 0 ? '#d97706' : '#1c0a00' }}>{lowCount}</p>
-          {lowCount > 0 && <p style={styles.summaryNote}>Needs restocking soon</p>}
+
+        {/* Filters */}
+        <div
+          style={{
+            display: "flex",
+            gap: "1rem",
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <input
+            type="text"
+            placeholder="Search products…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: "200px",
+              padding: "0.55rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid #d6c5b0",
+              fontSize: "0.9rem",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {allCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilterCat(cat)}
+                style={{
+                  padding: "0.4rem 0.9rem",
+                  borderRadius: "20px",
+                  border: "1px solid",
+                  borderColor: filterCat === cat ? "#b45309" : "#d6c5b0",
+                  background: filterCat === cat ? "#b45309" : "#fff",
+                  color: filterCat === cat ? "#fff" : "#5c3d1a",
+                  cursor: "pointer",
+                  fontSize: "0.82rem",
+                  fontWeight: 500,
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{ ...styles.summaryCard, ...(outCount > 0 ? { background: '#fff5f5', borderColor: '#fecaca' } : {}) }}>
-          <p style={styles.summaryLabel}>Out of stock</p>
-          <p style={{ ...styles.summaryValue, color: outCount > 0 ? '#dc2626' : '#1c0a00' }}>{outCount}</p>
-          {outCount > 0 && <p style={{ ...styles.summaryNote, color: '#dc2626' }}>Urgent restocking needed</p>}
-        </div>
-      </div>
 
-      {/* Search */}
-      <div style={styles.searchWrap}>
-        <span>🔍</span>
-        <input type="text" placeholder="Search by product or category..." value={search} onChange={e => setSearch(e.target.value)} style={styles.searchInput} />
-      </div>
-
-      {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
-      {error && <div style={styles.errorBox}>{error}</div>}
-
-      {!loading && !error && (
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr style={styles.thead}>
-                {['Product', 'Category', 'Price', 'Stock level', 'Quantity', 'Action'].map(h => (
-                  <th key={h} style={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(item => {
-                const level = getLevel(item.stock_quantity);
-                const isEditing = editing === item.id;
-                const isSaved = successId === item.id;
-                return (
-                  <tr key={item.id} style={{ ...styles.tr, ...(isSaved ? { background: '#f0fdf4' } : {}) }}>
-                    <td style={styles.td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={styles.productIcon}>{CATEGORY_EMOJI[item.category] || '📦'}</div>
-                        <span style={{ fontWeight: 600, color: '#1c0a00' }}>{item.name}</span>
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={styles.catBadge}>{item.category}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ color: '#44403c' }}>KSh {Number(item.price).toLocaleString()}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={styles.barTrack}>
-                          <div style={{ ...styles.barFill, width: `${level.pct}%`, background: level.bar }} />
-                        </div>
-                        <span style={{ ...styles.levelBadge, color: level.color, background: level.bg }}>{level.label}</span>
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      {isEditing ? (
-                        <input
-                          type="number" min="0" value={newQty}
-                          onChange={e => setNewQty(e.target.value)}
-                          autoFocus
-                          style={styles.qtyInput}
-                        />
-                      ) : (
-                        <span style={{ fontWeight: 700, color: item.stock_quantity === 0 ? '#dc2626' : '#1c0a00' }}>
-                          {isSaved ? '✓ ' : ''}{item.stock_quantity}
-                        </span>
-                      )}
-                    </td>
-                    <td style={styles.td}>
-                      {isEditing ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => handleSave(item.id)} disabled={saving} style={styles.saveBtn}>
-                            {saving ? '...' : 'Save'}
-                          </button>
-                          <button onClick={() => setEditing(null)} style={styles.cancelBtn}>Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => { setEditing(item.id); setNewQty(String(item.stock_quantity)); }} style={styles.editBtn}>
-                          ✏️ Edit
-                        </button>
-                      )}
+        {/* Products table */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "3rem", color: "#7c3d12" }}>
+            Loading inventory…
+          </div>
+        ) : (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "12px",
+              border: "1px solid #e8ddd0",
+              overflow: "hidden",
+            }}
+          >
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f5f0ea" }}>
+                  {["Product", "Category", "Price (KSh)", "Stock", "Status", "Action"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "0.9rem 1rem",
+                          textAlign: "left",
+                          fontSize: "0.82rem",
+                          fontWeight: 700,
+                          color: "#7c3d12",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          borderBottom: "1px solid #e8ddd0",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{ padding: "2rem", textAlign: "center", color: "#888" }}
+                    >
+                      No products found.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : (
+                  filtered.map((product, i) => {
+                    const isLow =
+                      product.stock_quantity <= 10 && product.stock_quantity > 0;
+                    const isOut = product.stock_quantity === 0;
+                    return (
+                      <tr
+                        key={product.id}
+                        style={{
+                          background: i % 2 === 0 ? "#fff" : "#fafaf8",
+                          borderBottom: "1px solid #f0ece6",
+                        }}
+                      >
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 600, color: "#1a1a1a" }}>
+                            {product.name}
+                          </div>
+                          {product.description && (
+                            <div
+                              style={{
+                                fontSize: "0.78rem",
+                                color: "#888",
+                                marginTop: "2px",
+                              }}
+                            >
+                              {product.description.slice(0, 50)}
+                              {product.description.length > 50 ? "…" : ""}
+                            </div>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          <span
+                            style={{
+                              fontSize: "0.78rem",
+                              background: "#fef3c7",
+                              color: "#92400e",
+                              padding: "0.2rem 0.6rem",
+                              borderRadius: "20px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {product.category || "—"}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#7c3d12" }}>
+                          {Number(product.price).toLocaleString()}
+                        </td>
+                        <td style={tdStyle}>
+                          {editingId === product.id ? (
+                            <input
+                              type="number"
+                              value={editQty}
+                              onChange={(e) => setEditQty(e.target.value)}
+                              min="0"
+                              autoFocus
+                              style={{
+                                width: "80px",
+                                padding: "0.35rem 0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid #b45309",
+                                fontSize: "0.9rem",
+                                outline: "none",
+                              }}
+                            />
+                          ) : (
+                            <span style={{ fontWeight: 600 }}>
+                              {product.stock_quantity}
+                            </span>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          <span
+                            style={{
+                              fontSize: "0.78rem",
+                              padding: "0.2rem 0.6rem",
+                              borderRadius: "20px",
+                              fontWeight: 600,
+                              background: isOut
+                                ? "#fee2e2"
+                                : isLow
+                                ? "#fef3c7"
+                                : "#dcfce7",
+                              color: isOut ? "#dc2626" : isLow ? "#92400e" : "#166534",
+                            }}
+                          >
+                            {isOut ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          {editingId === product.id ? (
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                              <button
+                                onClick={() => handleSaveQty(product)}
+                                disabled={savingId === product.id}
+                                style={smallBtnStyle("#b45309")}
+                              >
+                                {savingId === product.id ? "…" : "Save"}
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                style={smallBtnStyle("#6b7280")}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingId(product.id);
+                                setEditQty(String(product.stock_quantity));
+                              }}
+                              style={smallBtnStyle("#5c3d1a")}
+                            >
+                              Edit Qty
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Add New Product Modal ── */}
+      {showAddModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "1rem",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "2rem",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h2
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  color: "#7c3d12",
+                  fontSize: "1.3rem",
+                  margin: 0,
+                }}
+              >
+                Add New Product
+              </h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.3rem",
+                  cursor: "pointer",
+                  color: "#888",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form fields */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={labelStyle}>Product Name *</label>
+                <input
+                  type="text"
+                  value={newProduct.name}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, name: e.target.value }))
+                  }
+                  placeholder="e.g. Fresh Whole Chicken 1.5kg"
+                  style={modalInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Description</label>
+                <textarea
+                  value={newProduct.description}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, description: e.target.value }))
+                  }
+                  placeholder="Brief product description…"
+                  rows={2}
+                  style={{ ...modalInputStyle, resize: "vertical" }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "1rem",
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Price (KSh) *</label>
+                  <input
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) =>
+                      setNewProduct((p) => ({ ...p, price: e.target.value }))
+                    }
+                    placeholder="e.g. 850"
+                    min="0"
+                    style={modalInputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Initial Stock *</label>
+                  <input
+                    type="number"
+                    value={newProduct.stock_quantity}
+                    onChange={(e) =>
+                      setNewProduct((p) => ({
+                        ...p,
+                        stock_quantity: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. 100"
+                    min="0"
+                    style={modalInputStyle}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Category *</label>
+                <select
+                  value={newProduct.category}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, category: e.target.value }))
+                  }
+                  style={{
+                    ...modalInputStyle,
+                    color: newProduct.category ? "#1a1a1a" : "#888",
+                  }}
+                >
+                  <option value="">Select category…</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {addError && (
+              <p
+                style={{
+                  color: "#dc2626",
+                  fontSize: "0.88rem",
+                  marginTop: "1rem",
+                  marginBottom: 0,
+                }}
+              >
+                {addError}
+              </p>
+            )}
+
+            {addStatus === "success" && (
+              <p
+                style={{
+                  color: "#15803d",
+                  fontSize: "0.88rem",
+                  marginTop: "1rem",
+                  fontWeight: 600,
+                }}
+              >
+                ✅ Product added successfully!
+              </p>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                gap: "1rem",
+                marginTop: "1.5rem",
+              }}
+            >
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "0.7rem",
+                  borderRadius: "10px",
+                  border: "1px solid #d6c5b0",
+                  background: "#fff",
+                  color: "#555",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProduct}
+                disabled={addStatus === "submitting"}
+                style={{
+                  flex: 2,
+                  padding: "0.7rem",
+                  borderRadius: "10px",
+                  background: addStatus === "submitting" ? "#ccc" : "#b45309",
+                  color: "#fff",
+                  border: "none",
+                  fontWeight: 700,
+                  cursor: addStatus === "submitting" ? "not-allowed" : "pointer",
+                  fontSize: "1rem",
+                }}
+              >
+                {addStatus === "submitting" ? "Adding…" : "Add Product"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } } input:focus { outline: none; border-color: #d97706 !important; }`}</style>
+
+      {/* Toast */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "2rem",
+            right: "2rem",
+            background: toast.type === "error" ? "#b91c1c" : "#15803d",
+            color: "#fff",
+            padding: "0.8rem 1.4rem",
+            borderRadius: "10px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+            zIndex: 9999,
+            fontSize: "0.9rem",
+            fontWeight: 500,
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
     </PageWrapper>
   );
 }
 
-const styles = {
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px' },
-  title: { fontFamily: "'Playfair Display', serif", fontSize: '28px', fontWeight: 700, color: '#1c0a00' },
-  sub: { fontSize: '14px', color: '#78716c', marginTop: '4px' },
-  refreshBtn: { background: '#fff', border: '1.5px solid #e7e5e4', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', fontWeight: 500, color: '#44403c', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
-  summaryCards: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' },
-  summaryCard: { background: '#fff', border: '1px solid #ede8e0', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
-  summaryLabel: { fontSize: '13px', color: '#78716c', marginBottom: '6px' },
-  summaryValue: { fontSize: '28px', fontWeight: 700, color: '#1c0a00', fontFamily: "'Playfair Display', serif" },
-  summaryNote: { fontSize: '12px', color: '#d97706', marginTop: '4px' },
-  searchWrap: { display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', border: '1.5px solid #e7e5e4', borderRadius: '12px', padding: '0 16px', marginBottom: '16px', maxWidth: '400px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
-  searchInput: { border: 'none', background: 'transparent', padding: '12px 0', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', width: '100%' },
-  tableWrap: { background: '#fff', borderRadius: '16px', border: '1px solid #ede8e0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
-  thead: { background: '#faf8f5', borderBottom: '1px solid #ede8e0' },
-  th: { padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#78716c', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  tr: { borderBottom: '1px solid #f5f0ea', transition: 'background 0.1s' },
-  td: { padding: '14px 16px', verticalAlign: 'middle' },
-  productIcon: { width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #fde8c8, #fdba74)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 },
-  catBadge: { fontSize: '12px', color: '#78716c', background: '#f5f0ea', padding: '3px 10px', borderRadius: '100px', textTransform: 'capitalize' },
-  barTrack: { width: '80px', height: '6px', background: '#f5f0ea', borderRadius: '100px', overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: '100px', transition: 'width 0.3s' },
-  levelBadge: { fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '100px', whiteSpace: 'nowrap' },
-  qtyInput: { width: '80px', border: '1.5px solid #d97706', borderRadius: '8px', padding: '6px 10px', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00' },
-  saveBtn: { background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
-  cancelBtn: { background: '#fff', color: '#78716c', border: '1.5px solid #e7e5e4', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
-  editBtn: { background: '#fff', color: '#44403c', border: '1.5px solid #e7e5e4', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
-  center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
-  spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
-  errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px', marginBottom: '16px' },
+const tdStyle = {
+  padding: "0.85rem 1rem",
+  verticalAlign: "middle",
+  fontSize: "0.9rem",
+  color: "#333",
+};
+
+const smallBtnStyle = (bg) => ({
+  padding: "0.35rem 0.8rem",
+  borderRadius: "6px",
+  border: "none",
+  background: bg,
+  color: "#fff",
+  fontWeight: 600,
+  fontSize: "0.8rem",
+  cursor: "pointer",
+});
+
+const labelStyle = {
+  display: "block",
+  fontWeight: 600,
+  fontSize: "0.83rem",
+  color: "#5c3d1a",
+  marginBottom: "0.35rem",
+};
+
+const modalInputStyle = {
+  width: "100%",
+  padding: "0.55rem 0.85rem",
+  borderRadius: "8px",
+  border: "1px solid #d6c5b0",
+  fontSize: "0.9rem",
+  outline: "none",
+  boxSizing: "border-box",
+  background: "#fafafa",
 };

@@ -56,4 +56,24 @@ const getMyOrders = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, getProductById, placeOrder, getMyOrders };
+const submitInquiry = async (req, res) => {
+  try {
+    const { name, email, phone, inquiry_type, order_id, message } = req.body;
+    if (!name || !email || !message || !inquiry_type) {
+      return res.status(400).json({ success: false, message: "name, email, inquiry_type, and message are required." });
+    }
+    // Store in DB — requires an `inquiries` table (schema below)
+    const db = require("../config/db");
+    const [result] = await db.execute(
+      `INSERT INTO inquiries (name, email, phone, inquiry_type, order_id, message, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'open', NOW())`,
+      [name, email, phone || null, inquiry_type, order_id || null, message]
+    );
+    return res.status(201).json({ success: true, data: { id: result.insertId } });
+  } catch (err) {
+    console.error("submitInquiry error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = { getProducts, getProductById, placeOrder, getMyOrders, submitInquiry };

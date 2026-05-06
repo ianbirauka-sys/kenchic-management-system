@@ -3,6 +3,7 @@ const Stock = require('../models/stock.model');
 const Delivery = require('../models/delivery.model');
 const db = require('../config/db');
 const { sendSuccess, sendError } = require('../utils/response.utils');
+const Product = require('../models/product.model');
 
 const getAllOrders = async (req, res) => {
   try {
@@ -86,4 +87,18 @@ const getReports = async (req, res) => {
   }
 };
 
-module.exports = { getAllOrders, updateOrderStatus, getStock, updateStock, getDeliveries, createDelivery, getReports };
+const addProduct = async (req, res) => {
+  try {
+    const { name, description, price, category, stock_quantity } = req.body;
+    if (!name || !price || stock_quantity === undefined || !category) {
+      return res.status(400).json({ success: false, message: "name, price, category, and stock_quantity are required." });
+    }
+    const product = await Product.createProduct({ name, description, price, category, stock_quantity });
+    return res.status(201).json({ success: true, data: product });
+  } catch (err) {
+    console.error("addProduct error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = { getAllOrders, updateOrderStatus, getStock, updateStock, getDeliveries, createDelivery, getReports, addProduct };

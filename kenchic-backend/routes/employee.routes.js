@@ -4,7 +4,8 @@ const {
   getAllOrders, updateOrderStatus,
   getStock, updateStock,
   getDeliveries, createDelivery,
-  getReports
+  getReports,
+  addProduct
 } = require('../controllers/employee.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
@@ -26,5 +27,8 @@ router.post('/deliveries', createDelivery);
 
 // Reports
 router.get('/reports', getReports);
+
+// Products
+router.post('/products', addProduct);
 
 module.exports = router;

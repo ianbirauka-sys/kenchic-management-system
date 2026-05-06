@@ -10,7 +10,13 @@ const CATEGORY_EMOJI = { chicks: '🐣', poultry: '🍗', feed: '🌾', equipmen
 export default function Cart() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('cart') || '[]'));
+  const [cart, setCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('kenchic_cart')) || [];
+    } catch {
+      return [];
+    }
+  });
   const [step, setStep] = useState('cart');
   const [orderType, setOrderType] = useState('delivery');
   const [address, setAddress] = useState('');
@@ -27,7 +33,7 @@ export default function Cart() {
   const updateQty = (id, delta) => {
     setCart(prev => {
       const updated = prev.map(i => i.id === id ? { ...i, quantity: i.quantity + delta } : i).filter(i => i.quantity > 0);
-      localStorage.setItem('cart', JSON.stringify(updated));
+      localStorage.setItem('kenchic_cart', JSON.stringify(updated));
       return updated;
     });
   };
@@ -35,7 +41,7 @@ export default function Cart() {
   const removeItem = (id) => {
     setCart(prev => {
       const updated = prev.filter(i => i.id !== id);
-      localStorage.setItem('cart', JSON.stringify(updated));
+      localStorage.setItem('kenchic_cart', JSON.stringify(updated));
       return updated;
     });
   };
@@ -47,7 +53,7 @@ export default function Cart() {
       const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price }));
       const res = await placeOrder({ items, delivery_address: address, order_type: orderType });
       setOrderId(res.data.data.order_id);
-      localStorage.removeItem('cart');
+      localStorage.removeItem('kenchic_cart');
       setCart([]);
       setStep('payment');
     } catch (err) {
@@ -223,7 +229,45 @@ export default function Cart() {
   // ── Cart ──────────────────────────────────────────────────────────────────
   return (
     <PageWrapper cartCount={cartCount}>
-      <h1 style={styles.pageTitle}>Your Cart</h1>
+      {/* Hero */}
+      <div style={{
+        background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
+        borderRadius: '20px',
+        padding: '40px 48px',
+        marginBottom: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div>
+          <p style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.8)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            marginBottom: '8px'
+          }}>
+            Shopping Cart
+          </p>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '34px',
+            fontWeight: 700,
+            color: '#fff',
+            marginBottom: '8px'
+          }}>
+            Your Cart
+          </h1>
+          <p style={{
+            fontSize: '15px',
+            color: 'rgba(255,255,255,0.85)'
+          }}>
+            {cartCount > 0 ? `${cartCount} item${cartCount > 1 ? 's' : ''} ready for checkout` : 'Your cart is waiting for some delicious products'}
+          </p>
+        </div>
+        <span style={{ fontSize: '80px', opacity: 0.9 }}>🛒</span>
+      </div>
       {cart.length === 0 ? (
         <div style={styles.emptyState}>
           <p style={{ fontSize: '56px' }}>🛒</p>

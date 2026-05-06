@@ -33,15 +33,61 @@ export default function OrderTracking() {
 
   return (
     <PageWrapper>
-      {/* Header */}
-      <div style={styles.header}>
+      {/* Hero */}
+      <div style={{
+        background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
+        borderRadius: '20px',
+        padding: '40px 48px',
+        marginBottom: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
         <div>
-          <h1 style={styles.title}>My Orders</h1>
-          <p style={styles.sub}>Track and manage your Kenchic orders</p>
+          <p style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.8)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            marginBottom: '8px'
+          }}>
+            Order Management
+          </p>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '34px',
+            fontWeight: 700,
+            color: '#fff',
+            marginBottom: '8px'
+          }}>
+            My Orders
+          </h1>
+          <p style={{
+            fontSize: '15px',
+            color: 'rgba(255,255,255,0.85)'
+          }}>
+            Track and manage your Kenchic orders
+          </p>
         </div>
-        <button onClick={() => navigate('/customer/products')} style={styles.shopBtn}>
-          + Shop More
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <button onClick={() => navigate('/customer/products')} style={{
+            background: "#fff",
+            color: "#7c3d12",
+            border: "none",
+            borderRadius: "10px",
+            fontWeight: 700,
+            cursor: "pointer",
+            fontSize: "0.95rem",
+            padding: "0.75rem 1.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}>
+            + Shop More
+          </button>
+          <span style={{ fontSize: '80px', opacity: 0.9 }}>📦</span>
+        </div>
       </div>
 
       {loading && <div style={styles.center}><div style={styles.spinner} /></div>}

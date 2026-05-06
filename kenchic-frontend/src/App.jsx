@@ -7,6 +7,7 @@ import Register from './pages/auth/Register';
 import Products from './pages/customer/Products';
 import Cart from './pages/customer/Cart';
 import OrderTracking from './pages/customer/OrderTracking';
+import CustomerSupport from './pages/customer/CustomerSupport';
 
 import ChickCatalog from './pages/farmer/ChickCatalog';
 import FarmerOrder from './pages/farmer/FarmerOrder';
@@ -19,7 +20,7 @@ import Reports from './pages/employee/Reports';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'DM Sans, sans-serif', color: '#78716c' }}>Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/login" replace />;
   return children;
@@ -43,10 +44,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Customer */}
+          {/* Customer — products is public, cart and orders require auth */}
           <Route path="/customer/products" element={<Products />} />
           <Route path="/customer/cart" element={<ProtectedRoute allowedRoles={['customer']}><Cart /></ProtectedRoute>} />
           <Route path="/customer/orders" element={<ProtectedRoute allowedRoles={['customer']}><OrderTracking /></ProtectedRoute>} />
+          <Route path="/customer/support" element={<ProtectedRoute allowedRoles={['customer']}><CustomerSupport /></ProtectedRoute>} />
 
           {/* Farmer */}
           <Route path="/farmer/chicks" element={<ProtectedRoute allowedRoles={['farmer']}><ChickCatalog /></ProtectedRoute>} />

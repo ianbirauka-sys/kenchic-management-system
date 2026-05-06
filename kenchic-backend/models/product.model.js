@@ -22,6 +22,16 @@ const Product = {
   async updateStock(id, quantity) {
     await db.query('UPDATE products SET stock_quantity = ? WHERE id = ?', [quantity, id]);
   },
+
+  async createProduct({ name, description, price, category, stock_quantity }) {
+    const [result] = await db.execute(
+      `INSERT INTO products (name, description, price, category, stock_quantity, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [name, description || null, price, category, stock_quantity]
+    );
+    const [rows] = await db.execute("SELECT * FROM products WHERE id = ?", [result.insertId]);
+    return rows[0];
+  },
 };
 
 module.exports = Product;

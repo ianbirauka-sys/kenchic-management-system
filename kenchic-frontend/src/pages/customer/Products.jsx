@@ -1,277 +1,458 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getProducts } from '../../api/customer.api';
-import { useAuth } from '../../context/AuthContext';
-import PageWrapper from '../../components/PageWrapper';
-
-const CATEGORY_EMOJI = { chicks: '🐣', poultry: '🍗', feed: '🌾', equipment: '🔧' };
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { getProducts } from "../../api/customer.api";
+import PageWrapper from "../../components/PageWrapper";
 
 export default function Products() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('cart') || '[]'));
+  const [cart, setCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("kenchic_cart")) || [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [added, setAdded] = useState(null);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     getProducts()
-      .then(res => setProducts(res.data.data))
-      .catch(() => setError('Failed to load products.'))
+      .then((res) => setProducts(res.data?.data || res.data || []))
+      .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);
 
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("kenchic_cart", JSON.stringify(cart));
+  }, [cart]);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
   const addToCart = (product) => {
+    // Redirect guests to login
     if (!user) {
-      navigate('/login');
+      navigate("/login", { state: { from: "/customer/products" } });
       return;
     }
-
-    setCart(prev => {
-      const existing = prev.find(i => i.id === product.id);
-      const updated = existing
-        ? prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
-        : [...prev, { ...product, quantity: 1 }];
-      localStorage.setItem('cart', JSON.stringify(updated));
-      return updated;
+    setCart((prev) => {
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { ...product, quantity: 1 }];
     });
-    setAdded(product.id);
-    setTimeout(() => setAdded(null), 1500);
+    showToast(`${product.name} added to cart`);
   };
 
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-  const categories = ['all', ...new Set(products.map(p => p.category))];
-  const filtered = products.filter(p =>
-    (filter === 'all' || p.category === filter) &&
-    (p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
-  );
+  const categories = [
+    "All",
+    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
+  ];
 
-  const GuestNav = () => (
-    <nav style={guestNavStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-        <span style={{ fontSize: '28px' }}>🐔</span>
-        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '22px', fontWeight: 800, color: '#92400e' }}>
-          Kenchic<span style={{ color: '#d97706' }}>.</span>
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button onClick={() => navigate('/login')} style={guestLoginBtn}>Sign in</button>
-        <button onClick={() => navigate('/register')} style={guestRegisterBtn}>Register</button>
-      </div>
-    </nav>
-  );
+  const filtered = products.filter((p) => {
+    const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase());
+    const matchCat = category === "All" || p.category === category;
+    return matchSearch && matchCat;
+  });
 
-  const guestNavStyle = {
-    position: 'sticky', top: 0, zIndex: 100,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 32px', height: '64px',
-    background: 'rgba(255,255,255,0.97)',
-    backdropFilter: 'blur(12px)',
-    borderBottom: '1px solid #f3ede6',
-    boxShadow: '0 2px 16px rgba(180,80,0,0.06)',
-    fontFamily: "'DM Sans', sans-serif",
-  };
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const guestLoginBtn = {
-    background: 'none', border: '1.5px solid #e7e5e4',
-    borderRadius: '8px', padding: '7px 16px',
-    fontSize: '13px', fontWeight: 500, color: '#78716c',
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-  };
+  return (
+    <PageWrapper>
+      {/* ── Guest / Auth Navbar ── */}
+      <nav
+        style={{
+          background: "#fff",
+          borderBottom: "1px solid #e8ddd0",
+          padding: "0 2rem",
+          height: "64px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+        }}
+      >
+        {/* Logo */}
+        <Link
+          to="/"
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: "1.4rem",
+            fontWeight: 700,
+            color: "#7c3d12",
+            textDecoration: "none",
+          }}
+        >
+          🐔 Kenchic
+        </Link>
 
-  const guestRegisterBtn = {
-    background: 'linear-gradient(135deg, #d97706, #ea580c)',
-    color: '#fff', border: 'none', borderRadius: '8px',
-    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-    boxShadow: '0 2px 8px rgba(217,119,6,0.3)',
-  };
+        {/* Right side — guest vs authenticated */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          {user ? (
+            <>
+              {/* Cart button for logged-in customers */}
+              <button
+                onClick={() => navigate("/customer/cart")}
+                style={{
+                  background: "#f5f0ea",
+                  border: "1px solid #d6c5b0",
+                  borderRadius: "8px",
+                  padding: "0.45rem 1rem",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  color: "#5c3d1a",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                🛒 Cart
+                {cartCount > 0 && (
+                  <span
+                    style={{
+                      background: "#b45309",
+                      color: "#fff",
+                      borderRadius: "50%",
+                      width: "20px",
+                      height: "20px",
+                      fontSize: "0.75rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+              <span style={{ color: "#7c3d12", fontSize: "0.85rem" }}>
+                Hi, {user.name?.split(" ")[0]}
+              </span>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                style={{
+                  padding: "0.45rem 1.1rem",
+                  borderRadius: "8px",
+                  border: "1px solid #b45309",
+                  color: "#b45309",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  textDecoration: "none",
+                  transition: "all 0.2s",
+                }}
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                style={{
+                  padding: "0.45rem 1.1rem",
+                  borderRadius: "8px",
+                  background: "#b45309",
+                  color: "#fff",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  textDecoration: "none",
+                }}
+              >
+                Register
+              </Link>
+            </>
+          )}
+        </div>
+      </nav>
 
-  const productContent = (
-    <>
-      {/* Hero banner */}
-      <div style={styles.hero}>
+      {/* ── Hero Banner ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
+        borderRadius: '20px',
+        padding: '40px 48px',
+        marginBottom: '28px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
         <div>
-          <p style={styles.heroEyebrow}>Fresh & quality assured</p>
-          <h1 style={styles.heroTitle}>
-            Welcome, <span style={{ color: '#fef9c3' }}>{user?.name?.split(' ')[0]}</span> 👋
+          <p style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.8)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            marginBottom: '8px'
+          }}>
+            Fresh Products
+          </p>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '34px',
+            fontWeight: 700,
+            color: '#fff',
+            marginBottom: '8px'
+          }}>
+            Kenchic Marketplace
           </h1>
-          <p style={styles.heroSub}>Browse our full range of fresh Kenchic products</p>
+          <p style={{
+            fontSize: '15px',
+            color: 'rgba(255,255,255,0.85)'
+          }}>
+            Kenya's finest poultry, delivered to your door
+          </p>
         </div>
         <span style={{ fontSize: '80px', opacity: 0.9 }}>🐔</span>
       </div>
 
-      {/* Search + filters */}
-      <div style={styles.filterRow}>
-        <div style={styles.searchWrap}>
-          <span>🔍</span>
-          <input
-            type="text" placeholder="Search products..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={styles.searchInput}
-          />
-        </div>
-        <div style={styles.tabs}>
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setFilter(cat)}
-              style={{ ...styles.tab, ...(filter === cat ? styles.tabActive : {}) }}>
-              {cat === 'all' ? '✨ All' : `${CATEGORY_EMOJI[cat] || '📦'} ${cat}`}
+      {/* ── Filters ── */}
+      <div
+        style={{
+          background: "#fff",
+          padding: "1rem 2rem",
+          display: "flex",
+          gap: "1rem",
+          flexWrap: "wrap",
+          alignItems: "center",
+          borderBottom: "1px solid #e8ddd0",
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Search products…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: "200px",
+            padding: "0.55rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid #d6c5b0",
+            fontSize: "0.9rem",
+            outline: "none",
+          }}
+        />
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              style={{
+                padding: "0.45rem 1rem",
+                borderRadius: "20px",
+                border: "1px solid",
+                borderColor: category === cat ? "#b45309" : "#d6c5b0",
+                background: category === cat ? "#b45309" : "#fff",
+                color: category === cat ? "#fff" : "#5c3d1a",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: 500,
+              }}
+            >
+              {cat}
             </button>
           ))}
         </div>
       </div>
 
-      {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
-      {error && <div style={styles.errorBox}>{error}</div>}
+      {/* ── Product Grid ── */}
+      <div
+        style={{
+          padding: "2rem",
+          background: "#f5f0ea",
+          minHeight: "60vh",
+        }}
+      >
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "4rem", color: "#7c3d12" }}>
+            Loading products…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "4rem", color: "#888" }}>
+            No products found.
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: "1.5rem",
+            }}
+          >
+            {filtered.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAddToCart={addToCart}
+                isGuest={!user}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-      {!loading && !error && (
-        <>
-          <p style={styles.count}>{filtered.length} product{filtered.length !== 1 ? 's' : ''}</p>
-          {filtered.length === 0 ? (
-            <div style={styles.empty}>
-              <p style={{ fontSize: '48px' }}>🔍</p>
-              <p style={{ color: '#a8a29e', marginTop: '12px' }}>No products found</p>
-            </div>
-          ) : (
-            <div style={styles.grid}>
-              {filtered.map(p => (
-                <div key={p.id} style={styles.card}>
-                  <div style={styles.cardImg}>
-                    <span style={{ fontSize: '52px' }}>{CATEGORY_EMOJI[p.category] || '📦'}</span>
-                    <span style={{
-                      ...styles.badge,
-                      background: p.stock_quantity > 0 ? '#dcfce7' : '#fee2e2',
-                      color: p.stock_quantity > 0 ? '#16a34a' : '#dc2626',
-                    }}>
-                      {p.stock_quantity > 0 ? 'In stock' : 'Out of stock'}
-                    </span>
-                  </div>
-                  <div style={styles.cardBody}>
-                    <span style={styles.catLabel}>{p.category}</span>
-                    <h3 style={styles.cardName}>{p.name}</h3>
-                    <p style={styles.cardDesc}>{p.description || 'Premium quality Kenchic product.'}</p>
-                    <div style={styles.cardFooter}>
-                      <span style={styles.price}>KSh {Number(p.price).toLocaleString()}</span>
-                      <button
-                        onClick={() => addToCart(p)}
-                        disabled={p.stock_quantity === 0}
-                        style={{
-                          ...styles.addBtn,
-                          ...(added === p.id ? { background: '#16a34a' } : {}),
-                          ...(p.stock_quantity === 0 ? styles.addBtnDisabled : {}),
-                        }}
-                      >
-                        {added === p.id ? '✓ Added' : '+ Add'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {cartCount > 0 && (
-        <div style={styles.floatingCart} onClick={() => navigate('/customer/cart')}>
-          <span>🛒</span>
-          <span>{cartCount} item{cartCount > 1 ? 's' : ''} in cart</span>
-          <span>→</span>
+      {/* ── Toast ── */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "2rem",
+            right: "2rem",
+            background: toast.type === "success" ? "#15803d" : "#b91c1c",
+            color: "#fff",
+            padding: "0.8rem 1.4rem",
+            borderRadius: "10px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+            zIndex: 9999,
+            fontSize: "0.9rem",
+            fontWeight: 500,
+          }}
+        >
+          {toast.msg}
         </div>
       )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        input:focus { outline: none; }
-      `}</style>
-    </>
-  );
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#f5f0ea', fontFamily: "'DM Sans', sans-serif" }}>
-      {user ? (
-        <PageWrapper cartCount={cartCount}>{productContent}</PageWrapper>
-      ) : (
-        <>
-          <GuestNav />
-          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
-            {productContent}
-          </div>
-        </>
-      )}
-    </div>
+    </PageWrapper>
   );
 }
 
-const styles = {
-hero: {
-  background: 'linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)',
-  borderRadius: '20px', padding: '40px 48px', marginBottom: '28px',
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  heroEyebrow: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' },
-  heroTitle: { fontFamily: "'Playfair Display', serif", fontSize: '34px', fontWeight: 700, color: '#fff', marginBottom: '8px' },
-  heroSub: { fontSize: '15px', color: 'rgba(255,255,255,0.85)' },
-  filterRow: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' },
-  searchWrap: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    background: '#fff', border: '1.5px solid #e7e5e4',
-    borderRadius: '12px', padding: '0 16px', flex: 1, minWidth: '200px',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-  },
-  searchInput: { border: 'none', background: 'transparent', padding: '12px 0', fontSize: '14px', fontFamily: "'DM Sans', sans-serif", color: '#1c0a00', width: '100%' },
-  tabs: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  tab: {
-    padding: '8px 16px', borderRadius: '100px',
-    border: '1.5px solid #e7e5e4', background: '#fff',
-    fontSize: '13px', fontWeight: 500, color: '#78716c',
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", textTransform: 'capitalize',
-  },
-  tabActive: { background: '#fff7ed', borderColor: '#d97706', color: '#d97706', fontWeight: 600 },
-  count: { fontSize: '13px', color: '#a8a29e', marginBottom: '16px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' },
-card: {
-  background: '#fff', borderRadius: '16px',
-  border: '1px solid #e8ddd4', overflow: 'hidden',
-  boxShadow: '0 4px 12px rgba(180,80,0,0.1)',
-  },
-cardImg: {
-  background: 'linear-gradient(135deg, #fde8c8, #fdba74)',
-  height: '140px', display: 'flex', alignItems: 'center',
-  justifyContent: 'center', position: 'relative',
-},
-  badge: {
-    position: 'absolute', top: '12px', right: '12px',
-    fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '100px',
-  },
-  cardBody: { padding: '16px' },
-  catLabel: { fontSize: '11px', fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  cardName: { fontSize: '16px', fontWeight: 600, color: '#1c0a00', margin: '4px 0 6px', fontFamily: "'DM Sans', sans-serif" },
-  cardDesc: { fontSize: '13px', color: '#6b5c52', lineHeight: 1.5, marginBottom: '16px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' },
-  cardFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  price: { fontSize: '18px', fontWeight: 700, color: '#7c2d12', fontFamily: "'DM Sans', sans-serif" },
-  addBtn: {
-    background: 'linear-gradient(135deg, #d97706, #ea580c)',
-    color: '#fff', border: 'none', borderRadius: '8px',
-    padding: '8px 16px', fontSize: '13px', fontWeight: 600,
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-    boxShadow: '0 2px 8px rgba(217,119,6,0.3)', transition: 'all 0.2s',
-  },
-  addBtnDisabled: { background: '#e7e5e4', color: '#a8a29e', cursor: 'not-allowed', boxShadow: 'none' },
-  center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
-  spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
-  errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px' },
-  empty: { textAlign: 'center', padding: '80px 0' },
-  floatingCart: {
-    position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)',
-    background: 'linear-gradient(135deg, #d97706, #ea580c)',
-    color: '#fff', borderRadius: '100px', padding: '14px 28px',
-    display: 'flex', alignItems: 'center', gap: '10px',
-    fontSize: '14px', fontWeight: 600,
-    boxShadow: '0 8px 32px rgba(217,119,6,0.45)',
-    cursor: 'pointer', zIndex: 50, fontFamily: "'DM Sans', sans-serif",
-  },
-};
+function ProductCard({ product, onAddToCart, isGuest }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: "12px",
+        overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+        transition: "transform 0.2s, box-shadow 0.2s",
+        cursor: "default",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-3px)";
+        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.07)";
+      }}
+    >
+      {/* Product image placeholder */}
+      <div
+        style={{
+          height: "160px",
+          background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "3rem",
+        }}
+      >
+        🍗
+      </div>
+
+      <div style={{ padding: "1rem" }}>
+        {product.category && (
+          <span
+            style={{
+              fontSize: "0.75rem",
+              background: "#fef3c7",
+              color: "#92400e",
+              padding: "0.2rem 0.6rem",
+              borderRadius: "20px",
+              fontWeight: 600,
+            }}
+          >
+            {product.category}
+          </span>
+        )}
+        <h3
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: "1.1rem",
+            margin: "0.5rem 0 0.3rem",
+            color: "#1a1a1a",
+          }}
+        >
+          {product.name}
+        </h3>
+        <p
+          style={{
+            fontSize: "0.85rem",
+            color: "#666",
+            marginBottom: "0.8rem",
+            lineHeight: 1.5,
+            minHeight: "40px",
+          }}
+        >
+          {product.description || "Premium Kenchic quality."}
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{ fontWeight: 700, fontSize: "1.1rem", color: "#7c3d12" }}
+          >
+            KSh {Number(product.price).toLocaleString()}
+          </span>
+          <span
+            style={{
+              fontSize: "0.78rem",
+              color: product.stock_quantity > 0 ? "#15803d" : "#dc2626",
+              fontWeight: 500,
+            }}
+          >
+            {product.stock_quantity > 0
+              ? `${product.stock_quantity} in stock`
+              : "Out of stock"}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onAddToCart(product)}
+          disabled={product.stock_quantity === 0}
+          style={{
+            marginTop: "0.8rem",
+            width: "100%",
+            padding: "0.6rem",
+            background:
+              product.stock_quantity === 0 ? "#ccc" : "#b45309",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: product.stock_quantity === 0 ? "not-allowed" : "pointer",
+            fontWeight: 600,
+            fontSize: "0.9rem",
+            transition: "background 0.2s",
+          }}
+        >
+          {isGuest
+            ? "Sign in to Order"
+            : product.stock_quantity === 0
+            ? "Out of Stock"
+            : "Add to Cart"}
+        </button>
+      </div>
+    </div>
+  );
+}

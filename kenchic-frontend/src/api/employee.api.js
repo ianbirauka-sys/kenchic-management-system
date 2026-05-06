@@ -7,3 +7,4 @@ export const updateStock = (id, quantity) => api.patch(`/employee/stock/${id}`, 
 export const getDeliveries = () => api.get('/employee/deliveries');
 export const createDelivery = (data) => api.post('/employee/deliveries', data);
 export const getReports = () => api.get('/employee/reports');
+export const addProduct = (data) => api.post('/employee/products', data);
