@@ -1,178 +1,358 @@
-# Kenchic Management System
-BBIT 3.2 — Group 10A — JKUAT
+# 🐔 Kenchic Management system
 
-A full-stack web platform for Kenchic with three portals: customer, farmer, and employee.
-
----
-
-## Tech stack
-- **Frontend** — React + Tailwind CSS (Vite)
-- **Backend** — Node.js + Express
-- **Database** — MySQL
-- **Auth** — JWT with role-based access control
+A full-stack web application for Kenya's poultry industry — connecting **customers**, **farmers**, and **employees** on a single platform with M-Pesa payment integration.
 
 ---
 
-## Features
+## Table of Contents
 
-### Customer Portal
-- Browse and search products
-- Add items to cart with localStorage persistence
-- Secure checkout with M-Pesa integration
-- Order tracking and history
-- Customer support interface
-
-### Farmer Portal
-- Browse chick catalog
-- Place chick orders with multi-step checkout
-- Access farming resources and guides
-- Order tracking and management
-
-### Employee Portal
-- Order management and status updates
-- Stock level monitoring and updates
-- Delivery scheduling and tracking
-- Sales and inventory reports
-
-### UI/UX Highlights
-- Consistent hero sections across all portals with gradient backgrounds
-- Responsive design with mobile-first approach
-- Role-based navigation and access control
-- Modern card-based layouts with rounded corners
-- Professional typography using Playfair Display font
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Roles & Portals](#roles--portals)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Reference](#api-reference)
+- [Database Schema](#database-schema)
+- [Team Responsibilities](#team-responsibilities)
 
 ---
 
-## Recent Updates
+## Overview
 
-- ✅ **UI Consistency**: Applied uniform hero section styling across all customer pages (Products, Cart, Order Tracking) matching the farmer portal design
-- ✅ **Cart Functionality**: Fixed localStorage key synchronization for persistent cart data
-- ✅ **Navigation**: Removed duplicate navbar components and ensured consistent PageWrapper usage
-- ✅ **Build Optimization**: Successful production builds with proper chunking and minification
+Kenchic is a multi-role platform with three distinct portals:
+
+| Portal | Role | Key Actions |
+|--------|------|-------------|
+| **Customer** | `customer` | Browse & buy poultry products, track orders, M-Pesa checkout |
+| **Farmer** | `farmer` | Order day-old chicks, manage deliveries, access farming guides |
+| **Employee** | `employee` | Manage all orders, stock inventory, plan deliveries, view reports |
+
+After login, users are automatically redirected to their role-specific portal. The `/customer/products` page is publicly accessible (browsing without an account is allowed; checkout requires login).
 
 ---
 
-## Getting started
+## Tech Stack
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/Brandon-Morision/kenchic-management-system.git
-cd kenchic-management-system
+### Frontend
+- **React 18** with React Router v6
+- **Vite** for bundling and dev server
+- **Tailwind CSS** (utility classes) + inline styles for component-level theming
+- **Recharts** for analytics charts (sales over time, stock levels)
+- **Axios** for API calls with automatic JWT attachment and 401 redirect handling
+- **Google Fonts** — Playfair Display (headings) + DM Sans (body)
+
+### Backend (expected)
+- **Node.js + Express**
+- **JWT** authentication — token carries `user.role` for access control
+- **MySQL / PostgreSQL** relational database
+- **Safaricom Daraja API** for M-Pesa STK Push payments
+
+---
+
+## Roles & Portals
+
+### 🛒 Customer Portal (`/customer/*`)
+
+| Screen | Route | Auth Required |
+|--------|-------|---------------|
+| Product Listing | `/customer/products` | No (public) |
+| Cart | `/customer/cart` | Yes |
+| Order Tracking | `/customer/orders` | Yes |
+| Customer Support | `/customer/support` | Yes |
+
+**Checkout flow:**
+1. Add items to cart (stored in `localStorage` as `kenchic_cart`)
+2. Choose delivery or pickup, enter address
+3. Place order → receive `order_id`
+4. Enter M-Pesa phone → STK Push sent
+5. App polls `/payments/status/:checkoutRequestId` every 5 seconds (up to 12 retries / 60 seconds)
+6. On `completed` status → confirmation screen
+
+---
+
+### 🌾 Farmer Portal (`/farmer/*`)
+
+| Screen | Route | Auth Required |
+|--------|-------|---------------|
+| Chick Catalog | `/farmer/chicks` | Yes |
+| Order Chicks | `/farmer/order` | Yes |
+| Resources & Guides | `/farmer/resources` | Yes |
+
+**Order flow** (4-step wizard):
+1. Select chick breed
+2. Enter quantity, delivery/pickup, address
+3. Pay via M-Pesa STK Push
+4. Order confirmation
+
+Farmer cart is stored in `localStorage` as `farmer_cart`.
+
+---
+
+### 👷 Employee Dashboard (`/employee/*`)
+
+| Screen | Route | Auth Required |
+|--------|-------|---------------|
+| All Orders | `/employee/orders` | Yes (`employee` only) |
+| Stock Management | `/employee/stock` | Yes (`employee` only) |
+| Delivery Planning | `/employee/deliveries` | Yes (`employee` only) |
+| Reports & Analytics | `/employee/reports` | Yes (`employee` only) |
+
+**Reports page** shows:
+- Revenue line chart (last 30 days)
+- Daily orders bar chart
+- Stock level horizontal bar chart (colour-coded: green / amber / red)
+- Summary cards: total revenue, total orders, average order value, low-stock alerts
+
+---
+
+## Project Structure
+
+```
+src/
+├── api/
+│   ├── auth.api.js          # register, login, getMe
+│   ├── customer.api.js      # products, orders, inquiries
+│   ├── employee.api.js      # orders, stock, deliveries, reports
+│   ├── farmer.api.js        # chicks, farmer orders, resources
+│   ├── payment.api.js       # initiatePayment, checkPaymentStatus
+│   └── axios.js             # base Axios instance with JWT interceptor
+│
+├── context/
+│   └── AuthContext.jsx      # user, token, login(), logout(), loading
+│
+├── components/
+│   ├── Navbar.jsx           # role-aware sticky navbar with mobile menu
+│   └── PageWrapper.jsx      # layout shell wrapping all authenticated pages
+│
+└── pages/
+    ├── auth/
+    │   ├── Login.jsx
+    │   └── Register.jsx
+    ├── customer/
+    │   ├── Products.jsx      # public product grid + guest/auth navbar
+    │   ├── Cart.jsx          # cart → checkout → M-Pesa → confirmation
+    │   ├── OrderTracking.jsx # order list with progress stepper
+    │   └── CustomerSupport.jsx
+    ├── farmer/
+    │   ├── ChickCatalog.jsx  # chick cards with floating order CTA
+    │   ├── FarmerOrder.jsx   # 4-step order + payment wizard
+    │   └── Resources.jsx     # guides, tips, notices tabs
+    └── employee/
+        ├── Orders.jsx        # filterable orders table with inline status update
+        ├── StockManagement.jsx # inventory table + add product modal
+        ├── Deliveries.jsx    # delivery scheduling + status tracking
+        └── Reports.jsx       # Recharts analytics dashboard
 ```
 
-### 2. Set up the database
-- Open MySQL and run: `source kenchic-backend/config/schema.sql`
-- This creates the `kenchic_db` database and all tables
+---
 
-### 3. Set up the backend
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Backend API running (see [Environment Variables](#environment-variables))
+
+### Frontend Setup
+
 ```bash
-cd kenchic-backend
-cp .env.example .env        # then fill in your DB credentials and JWT secret
+# Install dependencies
 npm install
-npm run dev                 # runs on http://localhost:5000
+
+# Start development server
+npm run dev
 ```
 
-### 4. Set up the frontend
+The app runs at `http://localhost:5173` by default.
+
+### Build for Production
+
 ```bash
-cd kenchic-frontend
-cp .env.example .env        # VITE_API_BASE_URL=http://localhost:5000/api
-npm install
-npm run dev                 # runs on http://localhost:5173
+npm run build
+npm run preview
 ```
 
 ---
 
-## API endpoints
+## Environment Variables
 
-| Method | URL | Role | Description |
-|--------|-----|------|-------------|
-| POST | /api/auth/register | public | Register a new user |
-| POST | /api/auth/login | public | Login and get JWT token |
-| GET | /api/auth/me | any | Get current user |
-| GET | /api/customer/products | customer | List all products |
-| GET | /api/customer/products/:id | customer | Get product detail |
-| POST | /api/customer/orders | customer | Place an order |
-| GET | /api/customer/orders | customer | Get my orders |
-| GET | /api/farmer/chicks | farmer | List chick catalog |
-| POST | /api/farmer/orders | farmer | Place chick order |
-| GET | /api/farmer/orders | farmer | Get my orders |
-| GET | /api/farmer/resources | farmer | Get guides/resources |
-| GET | /api/employee/orders | employee | All orders |
-| PATCH | /api/employee/orders/:id/status | employee | Update order status |
-| GET | /api/employee/stock | employee | View stock levels |
-| PATCH | /api/employee/stock/:id | employee | Update stock quantity |
-| GET | /api/employee/deliveries | employee | View deliveries |
-| POST | /api/employee/deliveries | employee | Schedule delivery |
-| GET | /api/employee/reports | employee | Sales + stock reports |
+Create a `.env` file in the project root:
 
----
-
-## Auth headers
-All protected routes require:
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
 ```
-Authorization: Bearer <your_jwt_token>
+
+For the backend, you'll need:
+
+```env
+PORT=5000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=kenchic
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRES_IN=7d
+
+# Safaricom Daraja (M-Pesa)
+MPESA_CONSUMER_KEY=your_consumer_key
+MPESA_CONSUMER_SECRET=your_consumer_secret
+MPESA_SHORTCODE=your_shortcode
+MPESA_PASSKEY=your_passkey
+MPESA_CALLBACK_URL=https://yourdomain.com/api/payments/callback
 ```
 
 ---
 
-## User roles
-- `customer` — can browse products and place orders
-- `farmer` — can browse chicks and place chick orders
-- `employee` — full access to orders, stock, deliveries, and reports
+## API Reference
 
----
+All requests to protected routes must include:
 
-## Project structure
 ```
-kenchic-management-system/
-├── kenchic-backend/
-│   ├── config/         # DB connection + schema.sql
-│   ├── controllers/    # Business logic
-│   ├── middleware/     # Auth + role middleware
-│   ├── models/         # DB query functions
-│   ├── routes/         # Express routes
-│   ├── utils/          # JWT + response helpers
-│   └── server.js
-└── kenchic-frontend/
-    └── src/
-        ├── api/        # All axios calls
-        ├── context/    # Auth context
-        ├── components/ # Shared UI components
-        └── pages/      # auth / customer / farmer / employee
+Authorization: Bearer <token>
 ```
 
+The JWT payload includes `{ id, name, email, role }`. Role-based middleware checks `user.role` against `allowedRoles` for each route group.
+
 ---
 
-## Development
+### Auth
 
-### Scripts
-```bash
-# Backend
-cd kenchic-backend
-npm run dev          # Start development server
-npm test            # Run tests
+| Method | Endpoint | Body | Response |
+|--------|----------|------|----------|
+| `POST` | `/api/auth/register` | `{ name, email, password, role }` | `{ user, token }` |
+| `POST` | `/api/auth/login` | `{ email, password }` | `{ user, token }` |
+| `GET` | `/api/auth/me` | — | `{ user }` |
 
-# Frontend
-cd kenchic-frontend
-npm run dev         # Start development server
-npm run build       # Build for production
-npm run preview     # Preview production build
+---
+
+### Customer
+
+| Method | Endpoint | Auth | Body / Params | Response |
+|--------|----------|------|---------------|----------|
+| `GET` | `/api/customer/products` | No | — | `{ data: Product[] }` |
+| `GET` | `/api/customer/products/:id` | No | — | `{ data: Product }` |
+| `POST` | `/api/customer/orders` | Yes | `{ items, delivery_address, order_type }` | `{ data: { order_id } }` |
+| `GET` | `/api/customer/orders` | Yes | — | `{ data: Order[] }` |
+| `POST` | `/api/customer/inquiries` | Yes | `{ name, email, phone, inquiry_type, order_id, message }` | `{ message }` |
+
+---
+
+### Farmer
+
+| Method | Endpoint | Auth | Body | Response |
+|--------|----------|------|------|----------|
+| `GET` | `/api/farmer/chicks` | Yes | — | `{ data: Chick[] }` |
+| `POST` | `/api/farmer/orders` | Yes | `{ chick_id, quantity, delivery_type, delivery_address, notes }` | `{ data: { order_id } }` |
+| `GET` | `/api/farmer/orders` | Yes | — | `{ data: Order[] }` |
+| `GET` | `/api/farmer/resources` | Yes | — | `{ data: Resource[] }` |
+
+---
+
+### Employee
+
+| Method | Endpoint | Auth | Body | Response |
+|--------|----------|------|------|----------|
+| `GET` | `/api/employee/orders` | Yes (employee) | — | `{ data: Order[] }` |
+| `PATCH` | `/api/employee/orders/:id/status` | Yes (employee) | `{ status }` | `{ data: Order }` |
+| `GET` | `/api/employee/stock` | Yes (employee) | — | `{ data: Product[] }` |
+| `PATCH` | `/api/employee/stock/:id` | Yes (employee) | `{ stock_quantity }` | `{ data: Product }` |
+| `POST` | `/api/employee/products` | Yes (employee) | `{ name, description, price, category, stock_quantity }` | `{ data: Product }` |
+| `GET` | `/api/employee/deliveries` | Yes (employee) | — | `{ data: Delivery[] }` |
+| `POST` | `/api/employee/deliveries` | Yes (employee) | `{ order_id, scheduled_date, driver_name }` | `{ data: Delivery }` |
+| `GET` | `/api/employee/reports` | Yes (employee) | — | `{ data: { salesByDay, stockLevels } }` |
+
+---
+
+### Payments
+
+| Method | Endpoint | Auth | Body | Response |
+|--------|----------|------|------|----------|
+| `POST` | `/api/payments/initiate` | Yes | `{ order_id, phone_number }` | `{ data: { checkout_request_id } }` |
+| `GET` | `/api/payments/status/:checkoutRequestId` | Yes | — | `{ data: { status } }` |
+
+`status` values: `pending` · `completed` · `failed`
+
+---
+
+## Database Schema
+
+### `users`
+```sql
+id, name, email, password_hash, role ENUM('customer','farmer','employee'),
+phone, created_at
 ```
 
-### Environment Variables
-- **Backend**: Create `.env` with DB credentials, JWT secret, and M-Pesa API keys
-- **Frontend**: Set `VITE_API_BASE_URL` to backend URL
+### `products`
+```sql
+id, name, description, price, category, stock_quantity, created_at
+```
+
+### `chicks`  *(farmer-specific product type)*
+```sql
+id, name, description, price_per_chick, stock_quantity, created_at
+```
+
+### `orders`
+```sql
+id, user_id, order_type ENUM('delivery','pickup'),
+delivery_address, total_amount, status, payment_status,
+created_at, updated_at
+```
+
+`status` values: `pending` → `confirmed` → `processing` → `shipped` → `delivered` | `cancelled`
+
+### `order_items`
+```sql
+id, order_id, product_id, quantity, unit_price
+```
+
+### `farmer_orders`
+```sql
+id, farmer_id, chick_id, quantity, delivery_type,
+delivery_address, notes, total_amount, status,
+payment_status, created_at
+```
+
+### `deliveries`
+```sql
+id, order_id, driver_name, scheduled_date, status
+ENUM('scheduled','in_transit','delivered','failed'),
+created_at
+```
+
+### `resources`
+```sql
+id, title, description, file_url, created_at
+```
+
+### `inquiries`
+```sql
+id, user_id, name, email, phone, inquiry_type,
+order_id, message, created_at
+```
 
 ---
 
-## Contributing
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Team Responsibilities
+
+| Person | Area | Key Deliverables |
+|--------|------|-----------------|
+| **1** | Auth + Backend Structure | JWT middleware, role-based access, `/auth/register`, `/auth/login` |
+| **2** | Customer Portal | Products, Cart, Checkout (M-Pesa), Order Tracking, Support |
+| **3** | Farmer Portal | Chick Catalog, 4-step Order Wizard, Resources page |
+| **4** | Employee Dashboard | Orders table, Stock Management, Deliveries, Recharts Reports |
+| **5** | Database + API Contracts | ER diagram, shared API contract doc, integration testing |
+
+> **Integration note:** The `AuthContext` provides `user`, `token`, `login()`, and `logout()` globally. The `axios.js` instance auto-attaches the Bearer token to every request and redirects to `/login` on a 401 response. All role-protected routes use the `ProtectedRoute` wrapper in `App.jsx`.
 
 ---
 
-## License
-This project is part of BBIT 3.2 coursework at JKUAT.
+## Key Design Decisions
+
+- **Cart persistence** — both customer and farmer carts are stored in `localStorage` so they survive page refreshes.
+- **M-Pesa polling** — the frontend polls the payment status endpoint every 5 seconds with a maximum of 12 attempts (60-second timeout) before showing a failure state.
+- **Public product page** — `/customer/products` is intentionally accessible without login. Guest users see "Sign in to Order" buttons; clicking triggers a redirect to `/login` with a `state.from` return path.
+- **Role redirect on login** — after authentication, users are sent to their role's default route: `/customer/products`, `/farmer/chicks`, or `/employee/orders`.
+- **Mobile nav** — the `Navbar` component includes a responsive hamburger menu for screens too narrow to show the full link row.

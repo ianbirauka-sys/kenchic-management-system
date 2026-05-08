@@ -4,20 +4,21 @@ import { useState } from 'react';
 
 const NAV_LINKS = {
   customer: [
-    { label: 'Products', path: '/customer/products', icon: '🛍️' },
-    { label: 'My Orders', path: '/customer/orders', icon: '📦' },
-    { label: 'Cart', path: '/customer/cart', icon: '🛒', isCart: true },
+    { label: 'Products',  path: '/customer/products', icon: '🛍️' },
+    { label: 'My Orders', path: '/customer/orders',   icon: '📦' },
+    { label: 'Support',   path: '/customer/support',  icon: '💬' },
+    { label: 'Cart',      path: '/customer/cart',     icon: '🛒', isCart: true },
   ],
   farmer: [
-    { label: 'Catalog', path: '/farmer/chicks', icon: '🐣' },
-    { label: 'My Orders', path: '/farmer/order', icon: '📋' },
-    { label: 'Resources', path: '/farmer/resources', icon: '📚' },
+    { label: 'Catalog',   path: '/farmer/chicks',     icon: '🐣' },
+    { label: 'My Orders', path: '/farmer/order',      icon: '📋' },
+    { label: 'Resources', path: '/farmer/resources',  icon: '📚' },
   ],
   employee: [
-    { label: 'Orders', path: '/employee/orders', icon: '📋' },
-    { label: 'Stock', path: '/employee/stock', icon: '📦' },
+    { label: 'Orders',     path: '/employee/orders',     icon: '📋' },
+    { label: 'Stock',      path: '/employee/stock',      icon: '📦' },
     { label: 'Deliveries', path: '/employee/deliveries', icon: '🚚' },
-    { label: 'Reports', path: '/employee/reports', icon: '📊' },
+    { label: 'Reports',    path: '/employee/reports',    icon: '📊' },
   ],
 };
 
@@ -62,6 +63,7 @@ export default function Navbar({ cartCount = 0 }) {
                   ...styles.navLink,
                   ...(isActive ? styles.navLinkActive : {}),
                   ...(link.isCart ? styles.cartBtn : {}),
+                  ...(link.isCart && isActive ? styles.cartBtnActive : {}),
                 }}
               >
                 <span>{link.icon}</span>
@@ -154,6 +156,9 @@ const styles = {
     background: 'linear-gradient(135deg, #d97706, #ea580c)',
     color: '#fff', fontWeight: 600,
     boxShadow: '0 2px 10px rgba(217,119,6,0.3)',
+  },
+  cartBtnActive: {
+    boxShadow: '0 4px 16px rgba(217,119,6,0.45)',
   },
   cartBadge: {
     position: 'absolute', top: '-4px', right: '-4px',

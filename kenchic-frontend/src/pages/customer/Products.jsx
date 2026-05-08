@@ -81,20 +81,20 @@ export default function Products() {
 
   return (
     <PageWrapper cartCount={cartCount}>
-      {/* Guest top banner — only shown when not logged in */}
+      {/* Guest top bar — only visible when not logged in, sits above hero */}
       {!user && (
-        <div style={styles.guestBanner}>
-          <span style={styles.guestBannerText}>
-            🐔 Welcome to Kenchic — Kenya's trusted poultry brand
-          </span>
-          <div style={styles.guestBannerActions}>
-            <Link to="/login" style={styles.bannerSignIn}>Sign In</Link>
-            <Link to="/register" style={styles.bannerRegister}>Create Account</Link>
+        <div style={styles.guestBar}>
+          <p style={styles.guestBarText}>
+            👋 Browse freely — sign in when you're ready to order
+          </p>
+          <div style={styles.guestBarActions}>
+            <Link to="/login" style={styles.guestSignIn}>Sign In</Link>
+            <Link to="/register" style={styles.guestRegister}>Register Free</Link>
           </div>
         </div>
       )}
 
-      {/* Hero Banner — matches all other pages */}
+      {/* ── Hero — identical pattern to Cart, OrderTracking, StockManagement etc. ── */}
       <div style={styles.hero}>
         <div>
           <p style={styles.heroEyebrow}>Fresh Products</p>
@@ -115,24 +115,19 @@ export default function Products() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "16px" }}>
           {user && (
-            <button
-              onClick={() => navigate("/customer/cart")}
-              style={styles.cartHeroBtn}
-            >
+            <button onClick={() => navigate("/customer/cart")} style={styles.heroCartBtn}>
               🛒 Cart
-              {cartCount > 0 && (
-                <span style={styles.cartHeroBadge}>{cartCount}</span>
-              )}
+              {cartCount > 0 && <span style={styles.heroCartBadge}>{cartCount}</span>}
             </button>
           )}
           <span style={{ fontSize: "80px", opacity: 0.9 }}>🐔</span>
         </div>
       </div>
 
-      {/* Search + Filters */}
-      <div style={styles.filtersBar}>
+      {/* ── Filters bar ── */}
+      <div style={styles.filtersCard}>
         <div style={styles.searchWrap}>
-          <span style={styles.searchIcon}>🔍</span>
+          <span style={{ color: "#a8a29e", fontSize: "14px", flexShrink: 0 }}>🔍</span>
           <input
             type="text"
             placeholder="Search products…"
@@ -141,15 +136,12 @@ export default function Products() {
             style={styles.searchInput}
           />
         </div>
-        <div style={styles.categoryPills}>
+        <div style={styles.pillsRow}>
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
-              style={{
-                ...styles.pill,
-                ...(category === cat ? styles.pillActive : {}),
-              }}
+              style={{ ...styles.pill, ...(category === cat ? styles.pillActive : {}) }}
             >
               {cat}
             </button>
@@ -159,58 +151,41 @@ export default function Products() {
 
       {/* Results count */}
       {!loading && (
-        <div style={styles.resultsRow}>
-          <p style={styles.resultsText}>
-            {filtered.length} {filtered.length === 1 ? "product" : "products"}
-            {category !== "All" ? ` in ${category}` : ""}
-            {search ? ` matching "${search}"` : ""}
+        <p style={styles.resultsCount}>
+          {filtered.length} {filtered.length === 1 ? "product" : "products"}
+          {category !== "All" ? ` in ${category}` : ""}
+          {search ? ` matching "${search}"` : ""}
+        </p>
+      )}
+
+      {/* ── Product Grid ── */}
+      {loading ? (
+        <div style={styles.centerBox}>
+          <div style={styles.spinner} />
+          <p style={{ color: "#78716c", marginTop: "16px", fontSize: "14px" }}>Loading products…</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={styles.emptyState}>
+          <p style={{ fontSize: "56px" }}>🔍</p>
+          <p style={{ fontSize: "18px", fontWeight: 600, color: "#44403c", marginTop: "16px" }}>No products found</p>
+          <p style={{ fontSize: "14px", color: "#a8a29e", margin: "8px 0 24px" }}>
+            Try adjusting your search or filter
           </p>
+          <button onClick={() => { setSearch(""); setCategory("All"); }} style={styles.clearBtn}>
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {filtered.map((product) => (
+            <ProductCard key={product.id} product={product} onAddToCart={addToCart} isGuest={!user} />
+          ))}
         </div>
       )}
 
-      {/* Product Grid */}
-      <div style={styles.gridArea}>
-        {loading ? (
-          <div style={styles.loadingState}>
-            <div style={styles.spinner} />
-            <p style={{ color: "#78716c", marginTop: "16px", fontSize: "14px" }}>Loading products…</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p style={{ fontSize: "56px" }}>🔍</p>
-            <p style={{ fontSize: "18px", fontWeight: 600, color: "#44403c", marginTop: "16px" }}>
-              No products found
-            </p>
-            <p style={{ fontSize: "14px", color: "#a8a29e", margin: "8px 0 24px" }}>
-              Try adjusting your search or category filter
-            </p>
-            <button
-              onClick={() => { setSearch(""); setCategory("All"); }}
-              style={styles.clearBtn}
-            >
-              Clear filters
-            </button>
-          </div>
-        ) : (
-          <div style={styles.grid}>
-            {filtered.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={addToCart}
-                isGuest={!user}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Toast */}
       {toast && (
-        <div style={{
-          ...styles.toast,
-          background: toast.type === "success" ? "#15803d" : "#b91c1c",
-        }}>
+        <div style={{ ...styles.toast, background: toast.type === "success" ? "#15803d" : "#b91c1c" }}>
           {toast.type === "success" ? "✓ " : "⚠ "}{toast.msg}
         </div>
       )}
@@ -225,22 +200,23 @@ function ProductCard({ product, onAddToCart, isGuest }) {
   const inStock = product.stock_quantity > 0;
 
   return (
-    <div style={styles.card}
+    <div
+      style={styles.card}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-4px)";
         e.currentTarget.style.boxShadow = "0 12px 32px rgba(180,80,0,0.14)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 2px 8px rgba(180,80,0,0.06)";
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(180,80,0,0.05)";
       }}
     >
       {/* Image area */}
       <div style={styles.cardImg}>
         <span style={{ fontSize: "52px" }}>{emoji}</span>
         {!inStock && (
-          <div style={styles.outOfStockOverlay}>
-            <span style={styles.outOfStockLabel}>Out of Stock</span>
+          <div style={styles.soldOutOverlay}>
+            <span style={styles.soldOutBadge}>Out of Stock</span>
           </div>
         )}
         {product.category && (
@@ -253,28 +229,19 @@ function ProductCard({ product, onAddToCart, isGuest }) {
         <p style={styles.productDesc}>
           {product.description || "Premium Kenchic quality product."}
         </p>
-
         <div style={styles.cardFooter}>
           <div>
             <p style={styles.price}>KSh {Number(product.price).toLocaleString()}</p>
-            <p style={{
-              fontSize: "12px",
-              fontWeight: 500,
-              color: inStock ? "#15803d" : "#dc2626",
-              marginTop: "2px",
-            }}>
+            <p style={{ fontSize: "12px", fontWeight: 500, marginTop: "2px", color: inStock ? "#15803d" : "#dc2626" }}>
               {inStock ? `${product.stock_quantity} in stock` : "Unavailable"}
             </p>
           </div>
           <button
             onClick={() => onAddToCart(product)}
             disabled={!inStock}
-            style={{
-              ...styles.addBtn,
-              ...((!inStock) ? styles.addBtnDisabled : {}),
-            }}
+            style={{ ...styles.addBtn, ...(!inStock ? styles.addBtnDisabled : {}) }}
           >
-            {isGuest ? "Sign in" : inStock ? "Add to Cart" : "Sold Out"}
+            {!inStock ? "Sold Out" : isGuest ? "🔑 Sign in" : "Add to Cart"}
           </button>
         </div>
       </div>
@@ -283,45 +250,50 @@ function ProductCard({ product, onAddToCart, isGuest }) {
 }
 
 const styles = {
-  // Guest banner
-  guestBanner: {
-    background: "linear-gradient(135deg, #431407, #92400e)",
-    borderRadius: "12px",
+  // Guest top bar
+  guestBar: {
+    background: "#fff",
+    border: "1px solid #ede8e0",
+    borderRadius: "14px",
     padding: "12px 20px",
-    marginBottom: "16px",
+    marginBottom: "20px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
     gap: "12px",
+    boxShadow: "0 2px 8px rgba(180,80,0,0.05)",
   },
-  guestBannerText: { fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: 500 },
-  guestBannerActions: { display: "flex", gap: "10px" },
-  bannerSignIn: {
+  guestBarText: { fontSize: "14px", color: "#78716c", fontFamily: "'DM Sans', sans-serif" },
+  guestBarActions: { display: "flex", gap: "8px" },
+  guestSignIn: {
     padding: "7px 18px",
-    borderRadius: "8px",
-    border: "1.5px solid rgba(255,255,255,0.5)",
+    borderRadius: "10px",
+    border: "1.5px solid #d97706",
+    color: "#d97706",
+    fontWeight: 600,
+    fontSize: "13px",
+    textDecoration: "none",
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  guestRegister: {
+    padding: "7px 18px",
+    borderRadius: "10px",
+    background: "linear-gradient(135deg, #d97706, #ea580c)",
     color: "#fff",
     fontWeight: 600,
     fontSize: "13px",
     textDecoration: "none",
-  },
-  bannerRegister: {
-    padding: "7px 18px",
-    borderRadius: "8px",
-    background: "#fff",
-    color: "#7c3d12",
-    fontWeight: 700,
-    fontSize: "13px",
-    textDecoration: "none",
+    boxShadow: "0 2px 8px rgba(217,119,6,0.3)",
+    fontFamily: "'DM Sans', sans-serif",
   },
 
-  // Hero — identical structure to other pages
+  // Hero — exact same pattern as Cart.jsx / OrderTracking.jsx
   hero: {
     background: "linear-gradient(135deg, #431407 0%, #92400e 40%, #d97706 100%)",
     borderRadius: "20px",
     padding: "40px 48px",
-    marginBottom: "24px",
+    marginBottom: "28px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -333,6 +305,7 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     marginBottom: "8px",
+    fontFamily: "'DM Sans', sans-serif",
   },
   heroTitle: {
     fontFamily: "'Playfair Display', serif",
@@ -345,19 +318,21 @@ const styles = {
     fontSize: "15px",
     color: "rgba(255,255,255,0.85)",
     marginBottom: "16px",
+    fontFamily: "'DM Sans', sans-serif",
   },
-  heroStats: { display: "flex", gap: "20px", flexWrap: "wrap" },
+  heroStats: { display: "flex", gap: "10px", flexWrap: "wrap" },
   heroStat: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
     fontSize: "13px",
-    color: "rgba(255,255,255,0.8)",
-    background: "rgba(255,255,255,0.12)",
-    padding: "5px 12px",
+    color: "rgba(255,255,255,0.85)",
+    background: "rgba(255,255,255,0.15)",
+    padding: "5px 14px",
     borderRadius: "100px",
+    fontFamily: "'DM Sans', sans-serif",
   },
-  cartHeroBtn: {
+  heroCartBtn: {
     background: "#fff",
     color: "#7c3d12",
     border: "none",
@@ -372,7 +347,7 @@ const styles = {
     position: "relative",
     fontFamily: "'DM Sans', sans-serif",
   },
-  cartHeroBadge: {
+  heroCartBadge: {
     background: "#ea580c",
     color: "#fff",
     borderRadius: "50%",
@@ -385,12 +360,12 @@ const styles = {
     justifyContent: "center",
   },
 
-  // Filters bar
-  filtersBar: {
+  // Filters — matches the white card sections on other pages
+  filtersCard: {
     background: "#fff",
     borderRadius: "16px",
     border: "1px solid #ede8e0",
-    padding: "16px 20px",
+    padding: "18px 24px",
     marginBottom: "16px",
     display: "flex",
     gap: "16px",
@@ -409,7 +384,6 @@ const styles = {
     flex: 1,
     minWidth: "200px",
   },
-  searchIcon: { fontSize: "15px", color: "#a8a29e" },
   searchInput: {
     border: "none",
     background: "transparent",
@@ -420,9 +394,9 @@ const styles = {
     width: "100%",
     outline: "none",
   },
-  categoryPills: { display: "flex", gap: "6px", flexWrap: "wrap" },
+  pillsRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
   pill: {
-    padding: "6px 14px",
+    padding: "7px 16px",
     borderRadius: "100px",
     border: "1.5px solid #e7e5e4",
     background: "#fff",
@@ -440,11 +414,14 @@ const styles = {
     fontWeight: 600,
   },
 
-  resultsRow: { marginBottom: "16px" },
-  resultsText: { fontSize: "13px", color: "#a8a29e" },
+  resultsCount: {
+    fontSize: "13px",
+    color: "#a8a29e",
+    marginBottom: "16px",
+    fontFamily: "'DM Sans', sans-serif",
+  },
 
-  // Grid area
-  gridArea: { minHeight: "300px" },
+  // Grid
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
@@ -452,7 +429,7 @@ const styles = {
   },
 
   // States
-  loadingState: {
+  centerBox: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -488,15 +465,14 @@ const styles = {
     boxShadow: "0 4px 16px rgba(217,119,6,0.3)",
   },
 
-  // Product card
+  // Product card — matches the card style used across the app
   card: {
     background: "#fff",
     borderRadius: "16px",
     border: "1px solid #ede8e0",
     overflow: "hidden",
-    boxShadow: "0 2px 8px rgba(180,80,0,0.06)",
+    boxShadow: "0 2px 8px rgba(180,80,0,0.05)",
     transition: "transform 0.2s, box-shadow 0.2s",
-    cursor: "default",
   },
   cardImg: {
     height: "160px",
@@ -506,20 +482,20 @@ const styles = {
     justifyContent: "center",
     position: "relative",
   },
-  outOfStockOverlay: {
+  soldOutOverlay: {
     position: "absolute",
     inset: 0,
-    background: "rgba(255,255,255,0.65)",
+    background: "rgba(255,255,255,0.6)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
-  outOfStockLabel: {
+  soldOutBadge: {
     background: "#fee2e2",
     color: "#dc2626",
     fontSize: "12px",
     fontWeight: 700,
-    padding: "4px 12px",
+    padding: "4px 14px",
     borderRadius: "100px",
     border: "1px solid #fecaca",
   },
@@ -527,15 +503,15 @@ const styles = {
     position: "absolute",
     top: "10px",
     left: "10px",
-    background: "rgba(255,255,255,0.9)",
+    background: "rgba(255,255,255,0.92)",
     color: "#92400e",
     fontSize: "11px",
     fontWeight: 600,
     padding: "3px 10px",
     borderRadius: "100px",
-    backdropFilter: "blur(4px)",
+    fontFamily: "'DM Sans', sans-serif",
   },
-  cardBody: { padding: "16px" },
+  cardBody: { padding: "16px 20px 20px" },
   productName: {
     fontFamily: "'Playfair Display', serif",
     fontSize: "16px",
@@ -546,14 +522,16 @@ const styles = {
   productDesc: {
     fontSize: "13px",
     color: "#78716c",
-    lineHeight: 1.5,
-    marginBottom: "14px",
-    minHeight: "38px",
+    lineHeight: 1.55,
+    marginBottom: "16px",
+    minHeight: "40px",
+    fontFamily: "'DM Sans', sans-serif",
   },
   cardFooter: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-end",
+    gap: "12px",
   },
   price: {
     fontSize: "18px",
@@ -571,8 +549,9 @@ const styles = {
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
-    boxShadow: "0 2px 8px rgba(217,119,6,0.3)",
-    transition: "opacity 0.15s",
+    boxShadow: "0 2px 10px rgba(217,119,6,0.3)",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   addBtnDisabled: {
     background: "#e7e5e4",

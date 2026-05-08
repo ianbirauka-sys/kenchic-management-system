@@ -47,7 +47,7 @@ export default function Login() {
             <span style={styles.logoText}>Kenchic</span>
           </div>
           <h1 style={styles.tagline}>Fresh from farm<br />to your table.</h1>
-          <p style={styles.taglineSub}>Kenya's trusted poultry brand — serving customers, farmers, and communities since 1970.</p>
+          <p style={styles.taglineSub}>Kenya's trusted poultry brand. Serving customers, farmers, and communities since 1970.</p>
 
           <div style={styles.pillsWrap}>
             {['🛒 Shop fresh products', '🐣 Order quality chicks', '🚚 Track your delivery'].map((t, i) => (
