@@ -108,9 +108,10 @@ INSERT INTO users (name, email, password, role, phone) VALUES
   ('Kenchic Admin', 'admin@kenchic.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'employee', '0700000000');
 
 -- Sample products
-INSERT INTO products (name, description, price, category, stock_quantity) VALUES
-  ('Broiler Day-Old Chick', 'High quality broiler chick from certified hatchery', 80.00, 'chicks', 500),
-  ('Layer Day-Old Chick', 'Layer breed chick, starts laying at 20 weeks', 90.00, 'chicks', 300),
-  ('Kenchic Whole Chicken', 'Fresh whole chicken 1.5kg', 650.00, 'poultry', 100),
-  ('Chicken Portions', 'Mixed chicken portions 1kg', 450.00, 'poultry', 150),
-  ('Poultry Feed 50kg', 'Starter feed for chicks', 3200.00, 'feed', 80);
+INSERT INTO products (name, description, price, category, stock_quantity, image_url) VALUES
+  ('Broiler Day-Old Chick', 'High quality broiler chick from certified hatchery', 80.00, 'chicks', 500, '/Chicks.jpg'),
+  ('Layer Day-Old Chick', 'Layer breed chick, starts laying at 20 weeks', 90.00, 'chicks', 300, '/Chicks.jpg'),
+  ('Kenchic Whole Chicken', 'Fresh whole chicken 1.5kg', 650.00, 'poultry', 100, '/Whole chicken.jpg'),
+  ('Chicken Portions', 'Mixed chicken portions 1kg', 450.00, 'poultry', 150, '/Chicken portions.jpg'),
+  ('Smokie', 'Smokie chicken sausage, 500g', 220.00, 'Processed', 120, '/Smokie.jpg'),
+  ('Poultry Feed 50kg', 'Starter feed for chicks', 3200.00, 'feed', 80, NULL);

@@ -5,7 +5,8 @@ const { sendSuccess, sendError } = require('../utils/response.utils');
 const getProducts = async (req, res) => {
   try {
     const products = await Product.getAll();
-    return sendSuccess(res, products);
+    const visibleProducts = products.filter((product) => product.category !== 'feed');
+    return sendSuccess(res, visibleProducts);
   } catch (err) {
     return sendError(res, 'Failed to fetch products', 500);
   }
@@ -24,12 +25,37 @@ const getProductById = async (req, res) => {
 const placeOrder = async (req, res) => {
   try {
     const { items, delivery_address, order_type } = req.body;
-
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return sendError(res, 'Order must have at least one item');
     }
 
-    const total_amount = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+    const normalizedItems = items.map((item) => ({
+      product_id: Number(item.product_id),
+      quantity: Number(item.quantity),
+      unit_price: Number(item.unit_price),
+    }));
+
+    const invalidItem = normalizedItems.find((item) => !item.product_id || item.quantity <= 0 || item.unit_price <= 0);
+    if (invalidItem) {
+      return sendError(res, 'Each order item must include a valid product, quantity and unit price');
+    }
+
+    const productMap = {};
+    for (const item of normalizedItems) {
+      const product = await Product.findById(item.product_id);
+      if (!product) {
+        return sendError(res, `Product not found: ${item.product_id}`, 404);
+      }
+      if (product.stock_quantity < item.quantity) {
+        return sendError(res, `Insufficient stock for ${product.name}`, 400);
+      }
+      productMap[item.product_id] = product;
+    }
+
+    const total_amount = normalizedItems.reduce(
+      (sum, item) => sum + item.unit_price * item.quantity,
+      0
+    );
 
     const order_id = await Order.create({
       user_id: req.user.id,
@@ -38,7 +64,12 @@ const placeOrder = async (req, res) => {
       order_type: order_type || 'delivery',
     });
 
-    await Order.addItems(order_id, items);
+    await Order.addItems(order_id, normalizedItems);
+
+    for (const item of normalizedItems) {
+      const product = productMap[item.product_id];
+      await Product.updateStock(product.id, product.stock_quantity - item.quantity);
+    }
 
     return sendSuccess(res, { order_id, total_amount }, 'Order placed successfully', 201);
   } catch (err) {

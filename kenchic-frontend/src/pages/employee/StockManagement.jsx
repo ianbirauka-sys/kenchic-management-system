@@ -53,7 +53,7 @@ export default function StockManagement() {
     }
     setSavingId(product.id);
     try {
-      await updateStock(product.id, { stock_quantity: qty });
+      await updateStock(product.id, qty);
       setProducts((prev) =>
         prev.map((p) => (p.id === product.id ? { ...p, stock_quantity: qty } : p))
       );
@@ -118,7 +118,7 @@ export default function StockManagement() {
 
   const stockStats = {
     total: products.length,
-    lowStock: products.filter((p) => p.stock_quantity <= 10).length,
+    lowStock: products.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= 50).length,
     outOfStock: products.filter((p) => p.stock_quantity === 0).length,
   };
 
@@ -203,7 +203,7 @@ export default function StockManagement() {
         >
           {[
             { label: "Total Products", value: stockStats.total, color: "#7c3d12", bg: "#fef3c7" },
-            { label: "Low Stock (≤10)", value: stockStats.lowStock, color: "#b45309", bg: "#fee2e2" },
+            { label: "Low Stock (≤50)", value: stockStats.lowStock, color: "#b45309", bg: "#fee2e2" },
             { label: "Out of Stock", value: stockStats.outOfStock, color: "#dc2626", bg: "#fee2e2" },
           ].map(({ label, value, color, bg }) => (
             <div
@@ -321,7 +321,7 @@ export default function StockManagement() {
                 ) : (
                   filtered.map((product, i) => {
                     const isLow =
-                      product.stock_quantity <= 10 && product.stock_quantity > 0;
+                      product.stock_quantity > 0 && product.stock_quantity <= 50;
                     const isOut = product.stock_quantity === 0;
                     return (
                       <tr

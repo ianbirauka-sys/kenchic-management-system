@@ -31,8 +31,13 @@ const getPassword = (timestamp) => {
 };
 
 const formatPhone = (phone) => {
-  // Convert 07XX to 2547XX
-  const cleaned = phone.replace(/\s+/g, '').replace(/^0/, '254');
+  const cleaned = phone.replace(/\s+/g, '').replace(/^\+/, '');
+  if (cleaned.startsWith('0')) {
+    return `254${cleaned.slice(1)}`;
+  }
+  if (cleaned.startsWith('7')) {
+    return `254${cleaned}`;
+  }
   return cleaned;
 };
 

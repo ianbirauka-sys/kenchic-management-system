@@ -81,11 +81,17 @@ export default function Resources() {
                       <div>
                         <h3 style={styles.guideTitle}>{r.title}</h3>
                         <p style={styles.guideDesc}>{r.description}</p>
+                        {r.details && <p style={styles.guideExtra}>{r.details}</p>}
                       </div>
                     </div>
-                    <button onClick={e => e.preventDefault()} style={styles.downloadBtn}>
-                      📥 Download PDF
-                    </button>
+                    <div style={styles.guideDetailSection}>
+                      <p style={styles.guideSectionLabel}>What this section covers</p>
+                      <ul style={styles.guideList}>
+                        {(r.highlights || []).map((point, idx) => (
+                          <li key={idx} style={styles.guideListItem}>{point}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 );
               })}
@@ -173,11 +179,16 @@ const styles = {
   guideHeader: { display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' },
   guideTitle: { fontWeight: 600, color: '#1c0a00', fontSize: '15px', marginBottom: '4px', fontFamily: "'DM Sans', sans-serif" },
   guideDesc: { fontSize: '13px', color: '#78716c', lineHeight: 1.5 },
+  guideExtra: { fontSize: '13px', color: '#44403c', lineHeight: 1.7, marginTop: '10px' },
   downloadBtn: { background: 'none', border: '1.5px solid #d97706', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: 600, color: '#d97706', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
   tipCard: { background: '#fff', border: '1px solid #ede8e0', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'flex-start', gap: '14px', boxShadow: '0 2px 8px rgba(180,80,0,0.05)' },
   tipIcon: { width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #fde8c8, #fdba74)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 },
   tipTitle: { fontWeight: 600, color: '#1c0a00', fontSize: '15px', marginBottom: '6px', fontFamily: "'DM Sans', sans-serif" },
   tipBody: { fontSize: '13px', color: '#78716c', lineHeight: 1.6 },
+  guideDetailSection: { marginTop: '16px' },
+  guideSectionLabel: { fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', color: '#92400e', textTransform: 'uppercase', marginBottom: '10px' },
+  guideList: { paddingLeft: '18px', margin: 0, color: '#44403c', fontSize: '13px', lineHeight: 1.7 },
+  guideListItem: { marginBottom: '8px' },
   noticesList: { display: 'flex', flexDirection: 'column', gap: '12px' },
   noticeCard: { border: '1px solid', borderRadius: '14px', padding: '18px 20px', display: 'flex', alignItems: 'flex-start', gap: '14px' },
   noticeIcon: { fontSize: '24px', flexShrink: 0, marginTop: '2px' },

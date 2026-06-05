@@ -5,9 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import PageWrapper from '../../components/PageWrapper';
 
 const CHICK_INFO = {
-  'Broiler Day-Old Chick': { emoji: '🐥', maturity: '6–8 weeks', purpose: 'Meat production', tip: 'Best for commercial broiler farming', color: '#fff7ed', border: '#fed7aa' },
-  'Layer Day-Old Chick':   { emoji: '🐣', maturity: '18–20 weeks', purpose: 'Egg production', tip: 'Starts laying at ~20 weeks', color: '#f0fdf4', border: '#bbf7d0' },
+  'Broiler Day-Old Chick': { image: '/Broiler chicks.jpg', maturity: '6–8 weeks', purpose: 'Meat production', tip: 'Best for commercial broiler farming', color: '#fff7ed', border: '#fed7aa' },
+  'Layer Day-Old Chick':   { image: '/Layer chicks.jpg', maturity: '18–20 weeks', purpose: 'Egg production', tip: 'Starts laying at ~20 weeks', color: '#f0fdf4', border: '#bbf7d0' },
 };
+
+const DEFAULT_CHICK_IMAGE = '/roosters.jpg';
+const resolveImagePath = (src) => encodeURI(src || DEFAULT_CHICK_IMAGE);
 
 export default function ChickCatalog() {
   const { user } = useAuth();
@@ -46,10 +49,9 @@ export default function ChickCatalog() {
       <div style={styles.hero}>
         <div>
           <p style={styles.heroEyebrow}>Kenchic Certified Hatchery</p>
-          <h1 style={styles.heroTitle}>Welcome, <span style={{ color: '#fef9c3' }}>{user?.name?.split(' ')[0]}</span> 👋</h1>
+          <h1 style={styles.heroTitle}>Welcome, <span style={{ color: '#fef9c3' }}>{user?.name?.split(' ')[0]}</span></h1>
           <p style={styles.heroSub}>Order quality day-old chicks for your farm</p>
         </div>
-        <span style={{ fontSize: '80px', opacity: 0.9 }}>🐔</span>
       </div>
 
       {loading && <div style={styles.center}><div style={styles.spinner} /></div>}
@@ -58,12 +60,20 @@ export default function ChickCatalog() {
       {!loading && !error && (
         <div style={styles.grid}>
           {chicks.map(chick => {
-            const info = CHICK_INFO[chick.name] || { emoji: '🐤', maturity: 'Varies', purpose: 'Poultry farming', tip: '', color: '#fff7ed', border: '#fed7aa' };
+            const info = CHICK_INFO[chick.name] || { image: '/roosters.jpg', maturity: 'Varies', purpose: 'Poultry farming', tip: '', color: '#fff7ed', border: '#fed7aa' };
             return (
               <div key={chick.id} style={styles.card}>
                 {/* Card header */}
                 <div style={{ ...styles.cardHeader, background: info.color, border: `1px solid ${info.border}` }}>
-                  <span style={{ fontSize: '64px' }}>{info.emoji}</span>
+                  <img
+                    src={resolveImagePath(info.image)}
+                    alt={chick.name}
+                    style={styles.chickImage}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = DEFAULT_CHICK_IMAGE;
+                    }}
+                  />
                   <div>
                     <h2 style={styles.chickName}>{chick.name}</h2>
                     <p style={styles.chickPrice}>KSh {Number(chick.price).toLocaleString()} / chick</p>
@@ -115,7 +125,7 @@ export default function ChickCatalog() {
 
       {cartCount > 0 && (
         <div style={styles.floatingBtn} onClick={() => navigate('/farmer/order')}>
-          <span>🐣</span>
+          <span style={styles.floatingBtnBullet} />
           <span>{cartCount} chick{cartCount > 1 ? 's' : ''} in order</span>
           <span>→ Review Order</span>
         </div>
@@ -134,6 +144,7 @@ const styles = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '24px' },
   card: { background: '#fff', borderRadius: '20px', border: '1px solid #ede8e0', overflow: 'hidden', boxShadow: '0 4px 16px rgba(180,80,0,0.08)' },
   cardHeader: { padding: '28px 28px', display: 'flex', alignItems: 'center', gap: '20px', borderBottom: '1px solid #f5f0ea' },
+  chickImage: { width: '120px', height: '120px', objectFit: 'cover', borderRadius: '18px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)' },
   chickName: { fontFamily: "'Playfair Display', serif", fontSize: '20px', fontWeight: 700, color: '#1c0a00' },
   chickPrice: { fontSize: '16px', fontWeight: 700, color: '#d97706', marginTop: '4px' },
   cardBody: { padding: '24px' },
@@ -148,5 +159,6 @@ const styles = {
   center: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
   spinner: { width: '40px', height: '40px', border: '4px solid #f3ede6', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
   errorBox: { background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px', color: '#dc2626', fontSize: '14px' },
-  floatingBtn: { position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', borderRadius: '100px', padding: '14px 28px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 600, boxShadow: '0 8px 32px rgba(217,119,6,0.45)', cursor: 'pointer', zIndex: 50, fontFamily: "'DM Sans', sans-serif" },
+  floatingBtn: { position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #d97706, #ea580c)', color: '#fff', borderRadius: '100px', padding: '14px 28px', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', fontWeight: 600, boxShadow: '0 8px 32px rgba(217,119,6,0.45)', cursor: 'pointer', zIndex: 50, fontFamily: "'DM Sans', sans-serif" },
+  floatingBtnBullet: { width: '10px', height: '10px', borderRadius: '50%', background: '#fff', flexShrink: 0 },
 };

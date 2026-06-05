@@ -183,13 +183,13 @@ Create a `.env` file in the project root:
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-For the backend, you'll need:
+For the backend, you'll need a `.env` file inside the `kenchic-backend` folder:
 
 ```env
 PORT=5000
 DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=kenchic
+DB_PORT=3306 # Use 3307 if your XAMPP MySQL server is configured on that port
+DB_NAME=kenchic_db
 DB_USER=your_db_user
 DB_PASSWORD=your_db_password
 JWT_SECRET=your_jwt_secret_key

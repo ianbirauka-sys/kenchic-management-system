@@ -5,7 +5,26 @@ import { getChicks, placeChickOrder } from "../../api/farmer.api";
 import { initiatePayment, checkPaymentStatus } from "../../api/payment.api";
 import PageWrapper from "../../components/PageWrapper";
 
-const STEPS = ["Select Chicks", "Order Details", "Pay via M-Pesa", "Confirmation"];
+const STEPS = ["Select Product", "Order Details", "Pay via M-Pesa", "Confirmation"];
+const FARMER_PRODUCT_IMAGE_MAP = {
+  'broiler day-old chick': '/Broiler chicks.jpg',
+  'layer day-old chick': '/Layer chicks.jpg',
+  'poultry feed 50kg': '/Poultry feed.jpg',
+  'poultry feed': '/Poultry feed.jpg',
+};
+const DEFAULT_FARMER_PRODUCT_IMAGE = '/roosters.jpg';
+
+const resolveFarmerImagePath = (src) => encodeURI(src || DEFAULT_FARMER_PRODUCT_IMAGE);
+const getFarmerProductImage = (product) => {
+  const normalizedName = String(product.name || '').trim().toLowerCase();
+  if (FARMER_PRODUCT_IMAGE_MAP[normalizedName]) {
+    return resolveFarmerImagePath(FARMER_PRODUCT_IMAGE_MAP[normalizedName]);
+  }
+  if (normalizedName.includes('broiler')) return resolveFarmerImagePath('/Broiler chicks.jpg');
+  if (normalizedName.includes('layer')) return resolveFarmerImagePath('/Layer chicks.jpg');
+  if (normalizedName.includes('feed')) return resolveFarmerImagePath('/Poultry feed.jpg');
+  return resolveFarmerImagePath(product.image_url);
+};
 
 export default function FarmerOrder() {
   const { user } = useAuth();
@@ -90,9 +109,18 @@ export default function FarmerOrder() {
 
   // ── Step 2: initiate M-Pesa STK Push ──
   const handleInitiatePayment = async () => {
-    const cleaned = phone.replace(/\s+/g, "");
-    if (!cleaned.match(/^(07|01|2547|2541)\d{8}$/)) {
-      setError("Enter a valid Safaricom number (e.g. 0712345678).");
+    if (!orderId) {
+      setError("Order creation failed. Please place the order again before paying.");
+      return;
+    }
+
+    let cleaned = phone.replace(/\s+/g, '');
+    cleaned = cleaned.replace(/^\+/, '');
+    if (cleaned.startsWith('0')) cleaned = `254${cleaned.slice(1)}`;
+    if (cleaned.startsWith('7')) cleaned = `254${cleaned}`;
+
+    if (!cleaned.match(/^254[17]\d{8}$/)) {
+      setError("Enter a valid Safaricom number (e.g. 0712345678 or +254712345678).");
       return;
     }
     setError("");
@@ -102,11 +130,10 @@ export default function FarmerOrder() {
     try {
       const res = await initiatePayment({
         order_id: orderId,
-        phone: cleaned,
-        amount: totalCost,
+        phone_number: cleaned,
       });
       const reqId =
-        res.data?.data?.CheckoutRequestID || res.data?.CheckoutRequestID;
+        res.data?.data?.checkout_request_id || res.data?.checkout_request_id;
       setCheckoutRequestId(reqId);
       setPaymentStatus("polling");
       setPaymentMessage(
@@ -266,16 +293,16 @@ export default function FarmerOrder() {
             color: '#fff',
             marginBottom: '8px'
           }}>
-            Order Chicks
+            Order Farm Supplies
           </h1>
           <p style={{
             fontSize: '15px',
             color: 'rgba(255,255,255,0.85)'
           }}>
-            Select your chicks, confirm your order, and pay via M-Pesa
+            Select chicks or feed, confirm your order, and pay via M-Pesa
           </p>
         </div>
-        <span style={{ fontSize: '80px', opacity: 0.9 }}>🐔</span>
+        <span style={{ fontSize: '80px', opacity: 0.9 }}>🌾</span>
       </div>
 
       <Stepper />
@@ -289,7 +316,7 @@ export default function FarmerOrder() {
           minHeight: "60vh",
         }}
       >
-        {/* ── Step 0: Select Chick ── */}
+        {/* ── Step 0: Select Product ── */}
         {step === 0 && (
           <div>
             <h2
@@ -299,10 +326,10 @@ export default function FarmerOrder() {
                 marginBottom: "1.5rem",
               }}
             >
-              Choose a Chick Breed
+              Choose a Farm Product
             </h2>
             {chicks.length === 0 ? (
-              <p style={{ color: "#888" }}>No chicks available at the moment.</p>
+              <p style={{ color: "#888" }}>No farm products available at the moment.</p>
             ) : (
               <div
                 style={{
@@ -311,10 +338,10 @@ export default function FarmerOrder() {
                   gap: "1rem",
                 }}
               >
-                {chicks.map((chick) => (
+                {chicks.map((product) => (
                   <div
-                    key={chick.id}
-                    onClick={() => handleSelectChick(chick)}
+                    key={product.id}
+                    onClick={() => handleSelectChick(product)}
                     style={{
                       background: "#fff",
                       borderRadius: "12px",
@@ -333,8 +360,16 @@ export default function FarmerOrder() {
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
                   >
-                    <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>
-                      🐣
+                    <div style={{ marginBottom: "0.75rem" }}>
+                      <img
+                        src={getFarmerProductImage(product)}
+                        alt={product.name}
+                        style={{ width: "100%", height: "170px", objectFit: "cover", borderRadius: "14px", border: "1px solid #f3ede6" }}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = DEFAULT_FARMER_PRODUCT_IMAGE;
+                        }}
+                      />
                     </div>
                     <h3
                       style={{
@@ -344,7 +379,7 @@ export default function FarmerOrder() {
                         marginBottom: "0.3rem",
                       }}
                     >
-                      {chick.name}
+                      {product.name}
                     </h3>
                     <p
                       style={{
@@ -353,7 +388,7 @@ export default function FarmerOrder() {
                         marginBottom: "0.6rem",
                       }}
                     >
-                      {chick.description}
+                      {product.description}
                     </p>
                     <div
                       style={{
@@ -363,7 +398,7 @@ export default function FarmerOrder() {
                       }}
                     >
                       <strong style={{ color: "#7c3d12", fontSize: "1rem" }}>
-                        KSh {Number(chick.price_per_chick || chick.price).toLocaleString()} / chick
+                        KSh {Number(product.price_per_chick || product.price).toLocaleString()} {product.category === 'feed' ? '/ bag' : '/ chick'}
                       </strong>
                       <span
                         style={{
@@ -372,7 +407,7 @@ export default function FarmerOrder() {
                           fontWeight: 500,
                         }}
                       >
-                        {chick.available_stock || chick.stock} available
+                        {product.available_stock || product.stock} available
                       </span>
                     </div>
                   </div>
@@ -417,18 +452,30 @@ export default function FarmerOrder() {
                 borderRadius: "10px",
                 padding: "1rem",
                 marginBottom: "1.5rem",
-                display: "flex",
-                justifyContent: "space-between",
+                display: "grid",
+                gridTemplateColumns: "100px 1fr",
+                gap: "1rem",
                 alignItems: "center",
                 border: "1px solid #e8ddd0",
               }}
             >
-              <span style={{ fontWeight: 600, color: "#1a1a1a" }}>
-                🐣 {selected.name}
-              </span>
-              <span style={{ color: "#7c3d12", fontWeight: 600 }}>
-                KSh {Number(selected.price_per_chick || selected.price).toLocaleString()} each
-              </span>
+              <img
+                src={getFarmerProductImage(selected)}
+                alt={selected.name}
+                style={{ width: "100%", height: "100px", objectFit: "cover", borderRadius: "14px", border: "1px solid #f3ede6" }}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = DEFAULT_FARMER_PRODUCT_IMAGE;
+                }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.35rem" }}>
+                <span style={{ fontWeight: 600, color: "#1a1a1a" }}>
+                  {selected.category === 'feed' ? '🌾' : '🐣'} {selected.name}
+                </span>
+                <span style={{ color: "#7c3d12", fontWeight: 600 }}>
+                  KSh {Number(selected.price_per_chick || selected.price).toLocaleString()} each
+                </span>
+              </div>
             </div>
 
             {/* Quantity */}

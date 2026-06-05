@@ -85,13 +85,14 @@ const initiatePayment = async (req, res) => {
 const mpesaCallback = async (req, res) => {
   try {
     const { Body } = req.body;
-    const { stkCallback } = Body;
-    const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc } = stkCallback;
+    const { stkCallback } = Body || {};
+    const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc } = stkCallback || {};
+    const normalizedCheckoutId = String(CheckoutRequestID || '').trim();
 
     // Find the payment record
     const [payments] = await db.query(
-      'SELECT * FROM payments WHERE checkout_request_id = ?',
-      [CheckoutRequestID]
+      'SELECT * FROM payments WHERE TRIM(LOWER(checkout_request_id)) = TRIM(LOWER(?))',
+      [normalizedCheckoutId]
     );
 
     if (payments.length === 0) {
@@ -99,8 +100,9 @@ const mpesaCallback = async (req, res) => {
     }
 
     const payment = payments[0];
+    const success = Number(ResultCode) === 0;
 
-    if (ResultCode === 0) {
+    if (success) {
       // Payment successful
       const callbackMetadata = stkCallback.CallbackMetadata?.Item || [];
       const getMeta = (name) => callbackMetadata.find(i => i.Name === name)?.Value || null;
@@ -116,8 +118,8 @@ const mpesaCallback = async (req, res) => {
           result_code = ?,
           result_desc = ?,
           completed_at = NOW()
-         WHERE checkout_request_id = ?`,
-        [mpesaReceiptNumber, String(ResultCode), ResultDesc, CheckoutRequestID]
+         WHERE TRIM(LOWER(checkout_request_id)) = TRIM(LOWER(?))`,
+        [mpesaReceiptNumber, String(ResultCode), ResultDesc, normalizedCheckoutId]
       );
 
       // Update order payment status to paid
@@ -133,8 +135,8 @@ const mpesaCallback = async (req, res) => {
           status = 'failed',
           result_code = ?,
           result_desc = ?
-         WHERE checkout_request_id = ?`,
-        [String(ResultCode), ResultDesc, CheckoutRequestID]
+         WHERE TRIM(LOWER(checkout_request_id)) = TRIM(LOWER(?))`,
+        [String(ResultCode), ResultDesc, normalizedCheckoutId]
       );
 
       // Reset order payment status
@@ -157,10 +159,11 @@ const mpesaCallback = async (req, res) => {
 const checkPaymentStatus = async (req, res) => {
   try {
     const { checkout_request_id } = req.params;
+    const normalizedCheckoutId = String(checkout_request_id || '').trim();
 
     const [payments] = await db.query(
-      'SELECT * FROM payments WHERE checkout_request_id = ?',
-      [checkout_request_id]
+      'SELECT * FROM payments WHERE TRIM(LOWER(checkout_request_id)) = TRIM(LOWER(?))',
+      [normalizedCheckoutId]
     );
 
     if (payments.length === 0) {
@@ -168,8 +171,14 @@ const checkPaymentStatus = async (req, res) => {
     }
 
     const payment = payments[0];
+    let status = String(payment.status || '').toLowerCase();
+
+    if (status === 'pending' && String(payment.result_code) === '0') {
+      status = 'completed';
+    }
+
     return sendSuccess(res, {
-      status: payment.status,
+      status,
       mpesa_receipt_number: payment.mpesa_receipt_number,
       amount: payment.amount,
       result_desc: payment.result_desc,

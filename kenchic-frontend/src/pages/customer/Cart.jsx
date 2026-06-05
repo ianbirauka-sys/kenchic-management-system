@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { placeOrder } from '../../api/customer.api';
 import { initiatePayment, checkPaymentStatus } from '../../api/payment.api';
@@ -26,9 +26,19 @@ export default function Cart() {
   const [orderId, setOrderId] = useState(null);
   const [checkoutRequestId, setCheckoutRequestId] = useState(null);
   const [pollCount, setPollCount] = useState(0);
+  const [checkoutTotal, setCheckoutTotal] = useState(0);
+  const [orderItems, setOrderItems] = useState([]);
+  const [receiptPhone, setReceiptPhone] = useState('');
+  const [paymentReceiptNumber, setPaymentReceiptNumber] = useState(null);
 
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const cartCount = cart.reduce((sum, i) => sum + Number(i.quantity), 0);
+  const total = cart.reduce((sum, i) => sum + Number(i.price) * Number(i.quantity), 0);
+
+  useEffect(() => {
+    if (step === 'cart') {
+      setCheckoutTotal(total);
+    }
+  }, [total, step]);
 
   const updateQty = (id, delta) => {
     setCart(prev => {
@@ -53,6 +63,9 @@ export default function Cart() {
       const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price }));
       const res = await placeOrder({ items, delivery_address: address, order_type: orderType });
       setOrderId(res.data.data.order_id);
+      setCheckoutTotal(total);
+      setOrderItems(cart);
+      setReceiptPhone(phone);
       localStorage.removeItem('kenchic_cart');
       setCart([]);
       setStep('payment');
@@ -81,11 +94,85 @@ export default function Cart() {
       try {
         const res = await checkPaymentStatus(reqId);
         const status = res.data.data.status;
-        if (status === 'completed') setStep('confirmation');
-        else if (status === 'failed') { setStep('payment'); setError('Payment failed. Please try again.'); }
+        if (status === 'completed') {
+          setPaymentReceiptNumber(res.data.data.mpesa_receipt_number || null);
+          setStep('confirmation');
+        } else if (status === 'failed') { setStep('payment'); setError('Payment failed. Please try again.'); }
         else pollPaymentStatus(reqId, count + 1);
       } catch { pollPaymentStatus(reqId, count + 1); }
     }, 5000);
+  };
+
+  const printReceipt = () => {
+    if (step !== 'confirmation' || !orderId || !orderItems.length) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const receiptDate = new Date().toLocaleString('en-KE', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const itemsHtml = orderItems.map((item) => `
+      <tr>
+        <td style="padding:8px 4px; border-bottom:1px solid #ddd;">${item.name}</td>
+        <td style="padding:8px 4px; border-bottom:1px solid #ddd; text-align:right;">${item.quantity}</td>
+        <td style="padding:8px 4px; border-bottom:1px solid #ddd; text-align:right;">KSh ${(item.price * item.quantity).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Kenchic Receipt</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+            h1 { font-size: 24px; margin-bottom: 8px; }
+            .meta { margin-bottom: 16px; }
+            .meta div { margin-bottom: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+            th, td { padding: 10px 6px; }
+            th { text-align:left; border-bottom: 2px solid #ddd; }
+            .total-row td { font-weight: 700; border-top: 2px solid #000; }
+            .footer { margin-top: 20px; font-size: 13px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <h1>Kenchic Receipt</h1>
+          <div class="meta">
+            <div><strong>Order:</strong> #${orderId}</div>
+            <div><strong>Date:</strong> ${receiptDate}</div>
+            <div><strong>Paid by:</strong> ${receiptPhone || phone}</div>
+            <div><strong>Payment status:</strong> Paid</div>
+            ${paymentReceiptNumber ? `<div><strong>M-Pesa receipt:</strong> ${paymentReceiptNumber}</div>` : ''}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th style="text-align:right;">Qty</th>
+                <th style="text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="2">Total</td>
+                <td style="text-align:right;">KSh ${checkoutTotal.toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div class="footer">Thank you for your purchase. Keep this receipt for your records.</div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   // ── Confirmation ──────────────────────────────────────────────────────────
@@ -100,6 +187,9 @@ export default function Cart() {
           <div style={styles.resultActions}>
             <button onClick={() => navigate('/customer/orders')} style={styles.primaryBtn}>Track Order</button>
             <button onClick={() => navigate('/customer/products')} style={styles.outlineBtn}>Continue Shopping</button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '18px' }}>
+            <button onClick={printReceipt} style={{ ...styles.primaryBtn, minWidth: '180px' }}>Print receipt</button>
           </div>
         </div>
       </div>
@@ -124,7 +214,7 @@ export default function Cart() {
             ))}
           </div>
           <p style={{ fontSize: '13px', color: '#a8a29e', marginTop: '8px' }}>
-            KSh {total.toLocaleString()} · Order #{orderId}
+            KSh {checkoutTotal.toLocaleString()} · Order #{orderId}
           </p>
           <button onClick={() => { setStep('payment'); setError(''); }} style={{ ...styles.outlineBtn, marginTop: '20px' }}>
             Cancel and try again
@@ -150,7 +240,7 @@ export default function Cart() {
           </div>
           <div style={styles.amountBox}>
             <p style={{ fontSize: '13px', color: '#78716c' }}>Amount to pay</p>
-            <p style={styles.amountFig}>KSh {total.toLocaleString()}</p>
+            <p style={styles.amountFig}>KSh {checkoutTotal.toLocaleString()}</p>
             <p style={{ fontSize: '12px', color: '#a8a29e' }}>Order #{orderId}</p>
           </div>
           <div style={styles.fieldGroup}>

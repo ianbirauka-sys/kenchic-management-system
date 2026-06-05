@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getReports } from '../../api/employee.api';
 import PageWrapper from '../../components/PageWrapper';
+import { jsPDF } from 'jspdf';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Reports() {
@@ -41,12 +42,119 @@ export default function Reports() {
 
   const tooltipStyle = { borderRadius: '10px', border: '1px solid #ede8e0', fontSize: '13px', fontFamily: "'DM Sans', sans-serif" };
 
+  const downloadPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const maxWidth = 515;
+    let y = 50;
+
+    doc.setFontSize(18);
+    doc.text('Kenchic Revenue Report', margin, y);
+    y += 24;
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`, margin, y);
+    y += 24;
+
+    const summaryItems = [
+      { label: 'Total revenue', value: `KSh ${totalRevenue.toLocaleString()}` },
+      { label: 'Total orders', value: totalOrders },
+      { label: 'Avg order value', value: `KSh ${Math.round(avgOrder).toLocaleString()}` },
+      { label: 'Low stock alerts', value: lowStock },
+    ];
+
+    summaryItems.forEach((item) => {
+      doc.setFontSize(11);
+      doc.text(`${item.label}:`, margin, y);
+      doc.setFontSize(11);
+      doc.text(String(item.value), margin + 140, y);
+      y += 18;
+    });
+
+    y += 10;
+    doc.setFontSize(13);
+    doc.text('Sales By Day', margin, y);
+    y += 18;
+
+    doc.setFontSize(10);
+    doc.text('Date', margin, y);
+    doc.text('Revenue', margin + 200, y);
+    doc.text('Orders', margin + 340, y);
+    y += 16;
+
+    data.salesByDay.forEach((row) => {
+      if (y > 760) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.setFontSize(10);
+      doc.text(new Date(row.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }), margin, y);
+      doc.text(`KSh ${Number(row.revenue || 0).toLocaleString()}`, margin + 200, y);
+      doc.text(String(row.total_orders), margin + 340, y);
+      y += 16;
+    });
+
+    y += 16;
+    if (y > 720) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFontSize(13);
+    doc.text('Stock Levels', margin, y);
+    y += 18;
+
+    doc.setFontSize(10);
+    doc.text('Product', margin, y);
+    doc.text('Category', margin + 240, y);
+    doc.text('Stock', margin + 420, y);
+    y += 16;
+
+    data.stockLevels.forEach((item) => {
+      if (y > 760) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.setFontSize(10);
+      const title = item.name.length > 28 ? `${item.name.substring(0, 25)}...` : item.name;
+      doc.text(title, margin, y);
+      doc.text(item.category || '—', margin + 240, y);
+      doc.text(String(item.stock_quantity), margin + 420, y);
+      y += 16;
+    });
+
+    doc.save('kenchic-revenue-report.pdf');
+  };
+
+  const printReport = () => {
+    const html = `<!DOCTYPE html><html><head><title>Kenchic Revenue Report</title><style>body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI, sans-serif;color:#1f2937;padding:24px;}h1,h2{color:#1c1917;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #d1d5db;padding:10px;text-align:left;}th{background:#f3f4f6;} .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-top:16px;} .summary-card{padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;} .metric{font-size:0.85rem;color:#6b7280;}</style></head><body>` +
+      `<h1>Kenchic Revenue Report</h1><p class="metric">Generated: ${new Date().toLocaleString('en-KE')}</p>` +
+      `<div class="summary-grid">` +
+      `<div class="summary-card"><div style="font-size:0.9rem;color:#6b7280;">Total revenue</div><div style="font-size:1.8rem;font-weight:700;color:#15803d;">KSh ${totalRevenue.toLocaleString()}</div></div>` +
+      `<div class="summary-card"><div style="font-size:0.9rem;color:#6b7280;">Total orders</div><div style="font-size:1.8rem;font-weight:700;color:#1c1917;">${totalOrders}</div></div>` +
+      `<div class="summary-card"><div style="font-size:0.9rem;color:#6b7280;">Avg order value</div><div style="font-size:1.8rem;font-weight:700;color:#1c1917;">KSh ${Math.round(avgOrder).toLocaleString()}</div></div>` +
+      `<div class="summary-card"><div style="font-size:0.9rem;color:#6b7280;">Low stock alerts</div><div style="font-size:1.8rem;font-weight:700;color:${lowStock > 0 ? '#b45309' : '#15803d'};">${lowStock}</div></div>` +
+      `</div><h2>Sales By Day</h2><table><thead><tr><th>Date</th><th>Revenue</th><th>Orders</th></tr></thead><tbody>` +
+      data.salesByDay.map((row) => `<tr><td>${new Date(row.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>KSh ${Number(row.revenue || 0).toLocaleString()}</td><td>${row.total_orders}</td></tr>`).join('') +
+      `</tbody></table><h2 style="margin-top:32px;">Stock Levels</h2><table><thead><tr><th>Product</th><th>Category</th><th>Stock Quantity</th></tr></thead><tbody>` +
+      data.stockLevels.map((item) => `<tr><td>${item.name}</td><td>${item.category || ''}</td><td>${item.stock_quantity}</td></tr>`).join('') +
+      `</tbody></table></body></html>`;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   return (
     <PageWrapper>
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>Reports & Analytics</h1>
           <p style={styles.sub}>Sales performance and inventory overview</p>
+        </div>
+        <div style={styles.actionRow}>
+          <button onClick={printReport} style={styles.actionBtn}>Print Report</button>
+          <button onClick={downloadPdf} style={{ ...styles.actionBtn, ...styles.secondaryBtn }}>Download PDF</button>
         </div>
       </div>
 
@@ -181,6 +289,9 @@ const styles = {
   summaryLabel: { fontSize: '13px', color: '#78716c', marginBottom: '6px' },
   summaryValue: { fontSize: '26px', fontWeight: 700, fontFamily: "'Playfair Display', serif" },
   summaryNote: { fontSize: '12px', color: '#a8a29e', marginTop: '4px' },
+  actionRow: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' },
+  actionBtn: { background: '#d97706', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.9rem 1.2rem', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 10px 20px rgba(217,119,6,0.18)' },
+  secondaryBtn: { background: '#fff', color: '#7c3d12', border: '1px solid #fcd34d' },
   tabs: { display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #ede8e0' },
   tab: { padding: '10px 20px', fontSize: '14px', fontWeight: 500, color: '#78716c', background: 'none', border: 'none', borderBottom: '2px solid transparent', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
   tabActive: { color: '#d97706', borderBottomColor: '#d97706', fontWeight: 600 },

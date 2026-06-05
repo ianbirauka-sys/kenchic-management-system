@@ -4,15 +4,52 @@ import { useAuth } from "../../context/AuthContext";
 import { getProducts } from "../../api/customer.api";
 import PageWrapper from "../../components/PageWrapper";
 
-const CATEGORY_EMOJI = {
-  chicks: "🐣",
-  poultry: "🍗",
-  feed: "🌾",
-  equipment: "🔧",
-  "Whole Chicken": "🍗",
-  "Chicken Parts": "🍖",
-  Processed: "📦",
-  Chicks: "🐣",
+const PRODUCT_IMAGE_MAP = {
+  poultry: '/Whole chicken.jpg',
+  equipment: '/background hen.jpg',
+  processed: '/Smokie.jpg',
+};
+
+const PRODUCT_NAME_IMAGE_MAP = {
+  'broiler day-old chick': '/Chicks.jpg',
+  'layer day-old chick': '/Chicks.jpg',
+  'kenchic whole chicken': '/Whole chicken.jpg',
+  'chicken portions': '/Chicken portions.jpg',
+  gizzard: '/Gizzard.jpg',
+  eggs: '/eggs.jpg',
+  smokie: '/Smokie.jpg',
+};
+
+const DEFAULT_PRODUCT_IMAGE = '/background hen.jpg';
+
+const resolveImageUrl = (src) => encodeURI(src || DEFAULT_PRODUCT_IMAGE);
+
+const getProductImage = (product) => {
+  if (product.image_url) return resolveImageUrl(product.image_url);
+
+  const normalizedName = String(product.name || '').trim().toLowerCase();
+
+  if (PRODUCT_NAME_IMAGE_MAP[normalizedName]) {
+    return resolveImageUrl(PRODUCT_NAME_IMAGE_MAP[normalizedName]);
+  }
+
+  if (normalizedName.includes('gizzard')) {
+    return resolveImageUrl('/Gizzard.jpg');
+  }
+  if (normalizedName.includes('egg')) {
+    return resolveImageUrl('/eggs.jpg');
+  }
+  if (normalizedName.includes('whole chicken')) {
+    return resolveImageUrl('/Whole chicken.jpg');
+  }
+  if (normalizedName.includes('chicken portions') || normalizedName.includes('portions')) {
+    return resolveImageUrl('/Chicken portions.jpg');
+  }
+  if (normalizedName.includes('chick')) {
+    return resolveImageUrl('/Chicks.jpg');
+  }
+
+  return resolveImageUrl(PRODUCT_IMAGE_MAP[product.category] || DEFAULT_PRODUCT_IMAGE);
 };
 
 export default function Products() {
@@ -72,6 +109,10 @@ export default function Products() {
   ];
 
   const filtered = products.filter((p) => {
+    const blockedProducts = ['Broiler Day-Old Chick', 'Layer Day-Old Chick'];
+    if (blockedProducts.includes(p.name) && user?.role !== 'farmer') {
+      return false;
+    }
     const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === "All" || p.category === category;
     return matchSearch && matchCat;
@@ -102,13 +143,13 @@ export default function Products() {
           <p style={styles.heroSub}>Kenya's finest poultry, delivered to your door</p>
           <div style={styles.heroStats}>
             {[
-              { icon: "✅", text: "Quality guaranteed" },
-              { icon: "🚚", text: "Nairobi delivery" },
-              { icon: "💳", text: "Pay via M-Pesa" },
-            ].map((s) => (
-              <div key={s.text} style={styles.heroStat}>
-                <span>{s.icon}</span>
-                <span>{s.text}</span>
+              'Quality guaranteed',
+              'Nairobi delivery',
+              'Pay via M-Pesa',
+            ].map((text) => (
+              <div key={text} style={styles.heroStat}>
+                <span style={styles.heroStatBullet} />
+                <span>{text}</span>
               </div>
             ))}
           </div>
@@ -116,18 +157,17 @@ export default function Products() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "16px" }}>
           {user && (
             <button onClick={() => navigate("/customer/cart")} style={styles.heroCartBtn}>
-              🛒 Cart
+              Cart
               {cartCount > 0 && <span style={styles.heroCartBadge}>{cartCount}</span>}
             </button>
           )}
-          <span style={{ fontSize: "80px", opacity: 0.9 }}>🐔</span>
         </div>
       </div>
 
       {/* ── Filters bar ── */}
       <div style={styles.filtersCard}>
         <div style={styles.searchWrap}>
-          <span style={{ color: "#a8a29e", fontSize: "14px", flexShrink: 0 }}>🔍</span>
+          <div style={styles.searchBullet} />
           <input
             type="text"
             placeholder="Search products…"
@@ -196,7 +236,7 @@ export default function Products() {
 }
 
 function ProductCard({ product, onAddToCart, isGuest }) {
-  const emoji = CATEGORY_EMOJI[product.category] || "🍗";
+  const imageUrl = getProductImage(product);
   const inStock = product.stock_quantity > 0;
 
   return (
@@ -213,7 +253,15 @@ function ProductCard({ product, onAddToCart, isGuest }) {
     >
       {/* Image area */}
       <div style={styles.cardImg}>
-        <span style={{ fontSize: "52px" }}>{emoji}</span>
+        <img
+          src={imageUrl}
+          alt={product.name}
+          style={styles.cardImgMedia}
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = DEFAULT_PRODUCT_IMAGE;
+          }}
+        />
         {!inStock && (
           <div style={styles.soldOutOverlay}>
             <span style={styles.soldOutBadge}>Out of Stock</span>
@@ -324,13 +372,20 @@ const styles = {
   heroStat: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "8px",
     fontSize: "13px",
-    color: "rgba(255,255,255,0.85)",
-    background: "rgba(255,255,255,0.15)",
-    padding: "5px 14px",
+    color: "rgba(255,255,255,0.95)",
+    background: "rgba(255,255,255,0.14)",
+    padding: "8px 14px",
     borderRadius: "100px",
     fontFamily: "'DM Sans', sans-serif",
+  },
+  heroStatBullet: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    background: "#fef3c7",
+    flexShrink: 0,
   },
   heroCartBtn: {
     background: "#fff",
@@ -383,6 +438,13 @@ const styles = {
     padding: "0 14px",
     flex: 1,
     minWidth: "200px",
+  },
+  searchBullet: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    background: "#d97706",
+    flexShrink: 0,
   },
   searchInput: {
     border: "none",
@@ -481,6 +543,12 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    overflow: "hidden",
+  },
+  cardImgMedia: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
   },
   soldOutOverlay: {
     position: "absolute",
