@@ -3,6 +3,32 @@ const db = require('../config/db');
 const { getAccessToken, getTimestamp, getPassword, formatPhone } = require('../utils/mpesa.utils');
 const { sendSuccess, sendError } = require('../utils/response.utils');
 
+const finalizePaidPayment = async (payment, mpesaReceiptNumber, resultCode, resultDesc) => {
+  await db.query(
+    `UPDATE payments SET
+      status = 'completed',
+      mpesa_receipt_number = ?,
+      result_code = ?,
+      result_desc = ?,
+      completed_at = NOW()
+     WHERE id = ?`,
+    [mpesaReceiptNumber, String(resultCode), resultDesc, payment.id]
+  );
+
+  await db.query(
+    `UPDATE orders SET
+      payment_status = 'paid',
+      status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END
+     WHERE id = ?`,
+    [payment.order_id]
+  );
+};
+
+const notifyCustomerPaymentReceived = async (userId, orderId, mpesaReceiptNumber) => {
+  // Placeholder for customer notification logic (email, SMS, push, in-app notification).
+  console.log(`Payment confirmed for order ${orderId} by user ${userId}. M-Pesa receipt: ${mpesaReceiptNumber}`);
+};
+
 // Initiate STK Push
 const initiatePayment = async (req, res) => {
   try {
@@ -108,25 +134,10 @@ const mpesaCallback = async (req, res) => {
       const getMeta = (name) => callbackMetadata.find(i => i.Name === name)?.Value || null;
 
       const mpesaReceiptNumber = getMeta('MpesaReceiptNumber');
-      const transactionDate = getMeta('TransactionDate');
 
-      // Update payment record
-      await db.query(
-        `UPDATE payments SET 
-          status = 'completed', 
-          mpesa_receipt_number = ?,
-          result_code = ?,
-          result_desc = ?,
-          completed_at = NOW()
-         WHERE TRIM(LOWER(checkout_request_id)) = TRIM(LOWER(?))`,
-        [mpesaReceiptNumber, String(ResultCode), ResultDesc, normalizedCheckoutId]
-      );
-
-      // Update order payment status to paid
-      await db.query(
-        'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
-        ['paid', 'confirmed', payment.order_id]
-      );
+      // Update payment and order status automatically for confirmed payment
+      await finalizePaidPayment(payment, mpesaReceiptNumber, ResultCode, ResultDesc);
+      await notifyCustomerPaymentReceived(payment.user_id, payment.order_id, mpesaReceiptNumber);
 
     } else {
       // Payment failed or cancelled
